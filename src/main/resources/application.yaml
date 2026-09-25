@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: textik-v-1
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/textik}
+    username: ${DB_USERNAME:textik}
+    password: ${DB_PASSWORD:textik}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: public
+
+  # --- Spring AI / Yandex (OpenAI-compatible endpoint) ---
+  # Плейсхолдер ниже нужен, чтобы из auto-configuration создались бины OpenAI.
+  # Заменить на настоящий ключ и endpoint Яндекса на Этапе 5.
+  ai:
+    openai:
+      api-key: ${YANDEX_AI_API_KEY:set-placeholder-key}
+      base-url: ${YANDEX_AI_BASE_URL:https://set-me-later.example.invalid}
+      chat:
+        options:
+          model: ${YANDEX_AI_MODEL:set-me-later}
+
+server:
+  port: 8080

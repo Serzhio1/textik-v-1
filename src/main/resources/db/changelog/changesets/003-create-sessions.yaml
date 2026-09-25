@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3-create-sessions
+      author: textik
+      comment: Learning sessions
+      changes:
+        - createTable:
+            tableName: sessions
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: PROPOSED
+                  constraints:
+                    nullable: false
+              - column:
+                  name: level
+                  type: VARCHAR(2)
+              - column:
+                  name: title
+                  type: VARCHAR(255)
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: text_content
+                  type: TEXT
+        - addForeignKeyConstraint:
+            baseTableName: sessions
+            baseColumnNames: user_id
+            constraintName: fk_sessions_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - sql:
+            sql: ALTER TABLE sessions ADD CONSTRAINT ck_sessions_status CHECK (status IN ('PROPOSED', 'READ', 'THINK', 'DISCUSS', 'DONE'))

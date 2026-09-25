@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: textik
+      POSTGRES_USER: textik
+      POSTGRES_PASSWORD: textik
+    ports:
+      - "5433:5432"
+    volumes:
+      - textik-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U textik -d textik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  textik-data:

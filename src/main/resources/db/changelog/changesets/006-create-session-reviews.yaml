@@ -1,0 +1,56 @@
+databaseChangeLog:
+  - changeSet:
+      id: 6-create-session-reviews
+      author: textik
+      comment: Session results / review
+      changes:
+        - createTable:
+            tableName: session_reviews
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: session_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+                    foreignKeyName: fk_session_reviews_session_id
+                    referencedTableName: sessions
+                    referencedColumnNames: id
+                    deleteCascade: true
+              - column:
+                  name: text_summary
+                  type: TEXT
+              - column:
+                  name: conversation_summary
+                  type: TEXT
+              - column:
+                  name: mistakes
+                  type: TEXT
+              - column:
+                  name: conversation_grade
+                  type: VARCHAR(2)
+              - column:
+                  name: questions_total
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: questions_correct
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false

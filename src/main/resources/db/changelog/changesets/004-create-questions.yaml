@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4-create-questions
+      author: textik
+      comment: Questions for a session
+      changes:
+        - createTable:
+            tableName: questions
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: session_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prompt
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: options
+                  type: JSONB
+                  constraints:
+                    nullable: false
+              - column:
+                  name: correct_answer
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: explanation
+                  type: TEXT
+              - column:
+                  name: user_answer
+                  type: TEXT
+              - column:
+                  name: is_correct
+                  type: BOOLEAN
+        - addForeignKeyConstraint:
+            baseTableName: questions
+            baseColumnNames: session_id
+            constraintName: fk_questions_session_id
+            referencedTableName: sessions
+            referencedColumnNames: id
+            onDelete: CASCADE

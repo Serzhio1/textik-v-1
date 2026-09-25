@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2-create-profiles
+      author: textik
+      comment: User profile
+      changes:
+        - createTable:
+            tableName: profiles
+            columns:
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                    foreignKeyName: fk_profiles_user_id
+                    referencedTableName: users
+                    referencedColumnNames: id
+                    deleteCascade: true
+              - column:
+                  name: about
+                  type: TEXT
+              - column:
+                  name: interests
+                  type: TEXT
+              - column:
+                  name: level
+                  type: VARCHAR(2)
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: ALTER TABLE profiles ADD CONSTRAINT ck_profiles_level CHECK (level IN ('A1', 'A2', 'B1'))

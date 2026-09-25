@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - include:
+      file: changesets/001-create-users.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changesets/002-create-profiles.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changesets/003-create-sessions.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changesets/004-create-questions.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changesets/005-create-chat-messages.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changesets/006-create-session-reviews.yaml
+      relativeToChangelogFile: true
