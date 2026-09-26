@@ -1,0 +1,6 @@
+# Не application.yaml: одноимённый файл здесь затенил бы конфиг из src/main/resources
+# (потерялись бы api-key/base-url для бинов Spring AI). Поэтому compose отключаем через профиль test.
+spring:
+  docker:
+    compose:
+      enabled: false

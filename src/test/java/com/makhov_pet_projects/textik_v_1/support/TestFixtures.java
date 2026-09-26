@@ -1,0 +1,27 @@
+package com.makhov_pet_projects.textik_v_1.support;
+
+import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.domain.Profile;
+import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
+import com.makhov_pet_projects.textik_v_1.repository.ProfileRepository;
+import java.util.UUID;
+import lombok.experimental.UtilityClass;
+
+@UtilityClass
+public class TestFixtures {
+
+	public String randomEmail() {
+		return UUID.randomUUID() + "@example.com";
+	}
+
+	public AppUser user(AppUserRepository users) {
+		return users.saveAndFlush(new AppUser(randomEmail(), "Sergey", "bcrypt-hash"));
+	}
+
+	public AppUser userWithProfile(AppUserRepository users, ProfileRepository profiles) {
+		AppUser user = user(users);
+		profiles.saveAndFlush(Profile.of(user.getId(), "Люблю IT и спорт", "technology, sport", "B1"));
+		return user;
+	}
+
+}
