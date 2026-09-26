@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.domain;
+package com.makhov_pet_projects.textik_v_1.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

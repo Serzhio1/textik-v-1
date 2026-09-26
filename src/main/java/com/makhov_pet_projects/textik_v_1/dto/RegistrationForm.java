@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.web;
+package com.makhov_pet_projects.textik_v_1.dto;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;

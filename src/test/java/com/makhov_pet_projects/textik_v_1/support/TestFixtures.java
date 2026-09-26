@@ -1,7 +1,7 @@
 package com.makhov_pet_projects.textik_v_1.support;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
-import com.makhov_pet_projects.textik_v_1.domain.Profile;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.Profile;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.ProfileRepository;
 import java.util.UUID;

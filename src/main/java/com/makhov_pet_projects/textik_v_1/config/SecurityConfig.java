@@ -1,6 +1,7 @@
-package com.makhov_pet_projects.textik_v_1.security;
+package com.makhov_pet_projects.textik_v_1.config;
 
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
+import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.BadCredentialsException;

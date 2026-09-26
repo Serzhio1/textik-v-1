@@ -1,6 +1,6 @@
 package com.makhov_pet_projects.textik_v_1.security;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.security.core.GrantedAuthority;

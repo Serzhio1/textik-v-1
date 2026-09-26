@@ -1,7 +1,9 @@
-package com.makhov_pet_projects.textik_v_1.domain;
+package com.makhov_pet_projects.textik_v_1.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
+import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

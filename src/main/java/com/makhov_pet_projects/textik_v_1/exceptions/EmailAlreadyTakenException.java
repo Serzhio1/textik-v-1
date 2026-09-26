@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.service;
+package com.makhov_pet_projects.textik_v_1.exceptions;
 
 public class EmailAlreadyTakenException extends RuntimeException {
 

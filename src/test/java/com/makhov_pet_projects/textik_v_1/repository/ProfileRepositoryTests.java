@@ -2,8 +2,8 @@ package com.makhov_pet_projects.textik_v_1.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
-import com.makhov_pet_projects.textik_v_1.domain.Profile;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.Profile;
 import com.makhov_pet_projects.textik_v_1.support.PostgresRepositoryTest;
 import com.makhov_pet_projects.textik_v_1.support.TestFixtures;
 import org.junit.jupiter.api.DisplayName;

@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.domain;
+package com.makhov_pet_projects.textik_v_1.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;

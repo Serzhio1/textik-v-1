@@ -1,6 +1,7 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.exceptions.EmailAlreadyTakenException;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;

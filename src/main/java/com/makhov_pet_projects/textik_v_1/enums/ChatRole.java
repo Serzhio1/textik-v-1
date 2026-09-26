@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.domain;
+package com.makhov_pet_projects.textik_v_1.enums;
 
 public enum ChatRole {
 

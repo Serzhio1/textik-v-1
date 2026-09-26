@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.domain;
+package com.makhov_pet_projects.textik_v_1.entity;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -13,6 +13,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
+import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
+import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;

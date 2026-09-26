@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.web;
+package com.makhov_pet_projects.textik_v_1.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.support.TestFixtures;
 import com.makhov_pet_projects.textik_v_1.support.WebTest;

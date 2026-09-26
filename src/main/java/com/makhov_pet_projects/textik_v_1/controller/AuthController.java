@@ -1,8 +1,9 @@
-package com.makhov_pet_projects.textik_v_1.web;
+package com.makhov_pet_projects.textik_v_1.controller;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.dto.RegistrationForm;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.exceptions.EmailAlreadyTakenException;
 import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
-import com.makhov_pet_projects.textik_v_1.service.EmailAlreadyTakenException;
 import com.makhov_pet_projects.textik_v_1.service.UserRegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

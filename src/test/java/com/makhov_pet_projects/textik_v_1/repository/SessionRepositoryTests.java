@@ -2,9 +2,9 @@ package com.makhov_pet_projects.textik_v_1.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
-import com.makhov_pet_projects.textik_v_1.domain.LearningSession;
-import com.makhov_pet_projects.textik_v_1.domain.SessionStatus;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
+import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import com.makhov_pet_projects.textik_v_1.support.PostgresRepositoryTest;
 import com.makhov_pet_projects.textik_v_1.support.TestFixtures;
 import java.util.List;

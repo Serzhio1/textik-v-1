@@ -1,4 +1,4 @@
-package com.makhov_pet_projects.textik_v_1.web;
+package com.makhov_pet_projects.textik_v_1.controller;
 
 import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

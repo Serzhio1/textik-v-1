@@ -1,6 +1,6 @@
 package com.makhov_pet_projects.textik_v_1.repository;
 
-import com.makhov_pet_projects.textik_v_1.domain.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.AppUser;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
