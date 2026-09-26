@@ -1,8 +1,26 @@
-# Textik — Техническое задание, принятые решения и план реализации (MVP)
+# Textik — ТЗ, принятые решения и план реализации (MVP)
 
-> **Назначение файла**: единая точка входа для любой новой сессии с ИИ.
-> Сверяем «Текущее состояние проекта» с «Планом задач», обновляем чекбоксы по мере
-> выполнения. Не нужно пересказывать ТЗ заново — оно зафиксировано здесь.
+> **Как пользоваться файлом:** единая точка входа для новой сессии с ИИ.
+> Разделы 1–2 — требования и решения (стабильны). **Раздел 3 — состояние кода на сегодня**,
+> его нужно сверять с реальностью. 4 — задачи по этапам с чекбоксами. 5 — открытые вопросы
+> и принятые технические решения. 6 — правила кода и тестов.
+> Правило файла: только факты, без пересказа. Устаревшая строка хуже отсутствующей.
+
+## 0. Быстрый старт
+
+```bash
+docker compose up -d            # Postgres 17, хост-порт 5433
+./mvnw test                     # 54 теста, ~30 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw spring-boot:run          # http://localhost:8080
+```
+
+- **Стек:** Java 21, Spring Boot **4.1.1**, Spring Security 7, Spring Data JPA, Thymeleaf,
+  Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент под Яндекс), Postgres 17, Lombok.
+- **Структура кода:** 10 плоских пакетов, таблица и направления зависимостей — **6.8**.
+- **Сделано:** Этапы 0–3 (инфраструктура, домен, аутентификация) — **3**.
+- **Следующий этап:** 4 — онбординг, профиль, прогресс — **4**.
+- **Правила и запреты:** 6 (комментарии, Lombok, тесты) и 5.1 (не трогать changeset-файлы,
+  не заводить `src/test/resources/application.yaml`).
 
 ---
 
@@ -12,13 +30,10 @@
 на основе персонализированного контента. Цель — одна законченная сессия на 40–50 минут
 по схеме **Read → Think → Discuss → Review**:
 
-1. **Read** (~20 мин) — пользователь читает англоязычный текст, сгенерированный ИИ под его
-   интересы и уровень.
-2. **Think** (5–10 мин) — 5–10 вопросов по тексту разных типов; после каждого ответа —
-   объяснение.
-3. **Discuss** (15–20 мин) — диалог с ИИ по тексту из 3–5 обменов; ИИ держит тему.
-4. **Review** (~5 мин) — отчёт: суммаризация, ошибки в тестах, оценка уровня разговора,
-   разбор ошибок. Результат уходит в историю.
+1. **Read** (~20 мин) — текст, сгенерированный ИИ под интересы и уровень.
+2. **Think** (5–10 мин) — 5–10 single-choice вопросов по тексту, после каждого ответа — объяснение.
+3. **Discuss** (15–20 мин) — диалог с ИИ по тексту, 3–5 обменов, ИИ держит тему.
+4. **Review** (~5 мин) — суммаризация, ошибки в тестах, оценка уровня разговора, разбор ошибок.
 
 ### Экраны по ТЗ
 
@@ -26,11 +41,11 @@
 |---|-------|-----------|
 | 1 | Onboarding | Имя + «О себе» (свободный текст) + «Сферы интересов» (через запятую). После заполнения — главный экран. Профиль далее редактируемый |
 | 2 | Главный экран | Название приложения, 4 плашки этапов (Read ~20 мин, Think 5–10 мин, Discuss 15–20 мин, Review ~5 мин), кнопка «Начать сессию» |
-| 3 | Выбор текста | Несколько карточек тем: название, краткое описание, кнопка «Начать чтение». Тексты подбираются по интересам и уровню |
-| 4 | Чтение | Название, описание, сам англоязычный текст, снизу кнопка «К вопросам» |
-| 5 | Вопросы | 5–10 вопросов разных типов. При неверном ответе — краткое объяснение. Снизу «К обсуждению» |
+| 3 | Выбор текста | Карточки тем: название, краткое описание, «Начать чтение». Темы подбираются по интересам и уровню |
+| 4 | Чтение | Название, описание, англоязычный текст, снизу «К вопросам» |
+| 5 | Вопросы | 5–10 вопросов. При неверном ответе — краткое объяснение. Снизу «К обсуждению» |
 | 6 | Обсуждение | Диалог с ИИ: задаёт вопросы, поддерживает разговор, возвращает к теме. Снизу «Перейти к ревью» |
-| 7 | Review | Поздравление, суммаризация, число ошибок в тестах, оценка уровня разговора, основные ошибки из диалога. Сохранение в историю. Кнопка на главный экран |
+| 7 | Review | Поздравление, суммаризация, число ошибок, оценка уровня разговора, основные ошибки. Сохранение в историю. Кнопка на главный экран |
 | 8 | Прогресс | Профиль + история: имя, аватар, почта, число пройденных сессий, «О себе», интересующие темы. Всё редактируемо |
 
 ---
@@ -39,182 +54,160 @@
 
 | # | Вопрос | Решение | Детали |
 |---|--------|---------|--------|
-| 1 | Источник контента (тексты/вопросы) | **Генерация через LLM API** | Тексты и вопросы генерирует ИИ на основе профиля (интересы + уровень). Никакого готового контент-сида |
-| 2 | Обсуждение (Discuss) | **Реальный LLM через API** | Диалог ведёт настоящая модель, не скрипт |
-| 3 | База данных | **PostgreSQL через `compose.yaml`** | Docker-контейнер `postgres:17`, том для данных, healthcheck. Возможности docker-compose модуля Spring Boot 4 используем |
-| 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt-хэш. **Email = логин**; в `users` хранится `username` — имя пользователя (Sergey и т.п.), отображается в профиле и в диалоге с ИИ |
-| 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, единый Spring Boot артефакт. Уже подключён в pom |
-| 6 | Способ интеграции с LLM | **Spring AI** | Официальный фреймворк. Structured Output (модель отдаёт JSON → POJO) для генерации вопросов и текстов |
-| 7 | LLM-провайдер | **Яндекс (YandexGPT)** | Пользователь ещё выбирает конкретную модель. Важно: официального Spring AI-провайдера Yandex нет; у Yandex есть OpenAI-совместимый endpoint → работаем через `spring-ai-starter-model-openai` с `base-url`/`api-key`/`model` на Яндекс |
-| 8 | Уровень пользователя (A1–B1) | **Ручной выбор в онбординге** | Добавляем поле уровня в онбординг (в исходном ТЗ его нет, но тексты обязаны подбираться по уровню) |
-| 9 | Аватар | **Без загрузки файлов** | В MVP — символ/инициалы из `username` или URL. Загрузка файлов не требуется |
-| 10 | Тип вопросов (Think) | **Только single-choice** | Все вопросы — один правильный из 4 вариантов; проверка детерминированная (сравнение с `correct_answer`). `q_type` и ИИ-оценка открытых ответов убраны из MVP |
-| 11 | Комментарии в коде | **Минимум: код должен говорить сам** | Комментарии — одна из главных причин технического долга: устаревают при правках, дублируют то, что уже видно в коде, и маскируют плохие имена. Вместо комментария — читаемое имя, маленький метод, ясная структура. Механический код поручаем Lombok: служебные классы — `@UtilityClass`, внедрение зависимостей — `@RequiredArgsConstructor`. Подробности — раздел 6 |
-| 12 | Структура пакетов | **10 плоских пакетов по роли, фичи не вкладываем** | Пакет отвечает на вопрос «какую роль играет класс», а не «в какой фиче он живёт»: `entity`, `enums`, `repository`, `service`, `dto`, `exceptions`, `controller`, `config`, `security`, `utility`. Вложенность (`byFeature`, `byLayer`) появится, когда модулей станет много, а не заранее. Зависимости идут в одну сторону: `controller → service → repository`, домен ни о ком не знает. Таблица «что где» и направления зависимостей — раздел 6.8 |
+| 1 | Источник контента | **Генерация через LLM API** | Тексты и вопросы генерирует ИИ из профиля (интересы + уровень), готового контент-сида нет |
+| 2 | Обсуждение (Discuss) | **Реальный LLM через API** | Диалог ведёт модель, не скрипт |
+| 3 | База данных | **PostgreSQL через `compose.yaml`** | Контейнер `postgres:17`, том, healthcheck, порт **5433** (5432 занят локальным Postgres). Модуль docker-compose Spring Boot 4 не используем: контейнер для разработки поднимается вручную |
+| 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt. **Email = логин**; в `users` хранится `username` — имя (Sergey и т.п.), видно в профиле и в диалоге с ИИ |
+| 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, один артефакт |
+| 6 | Способ интеграции с LLM | **Spring AI** | Structured Output: модель отдаёт JSON → record в `dto` |
+| 7 | LLM-провайдер | **Яндекс (YandexGPT)** | Официального Spring AI-провайдера Яндекса нет; у Яндекса есть OpenAI-совместимый endpoint → `spring-ai-starter-model-openai` с `base-url` / `api-key` / `model`. Конкретная модель не выбрана (5) |
+| 8 | Уровень пользователя (A1–B1) | **Ручной выбор в онбординге** | В исходном ТЗ поля нет, но тексты обязаны подбираться по уровню |
+| 9 | Аватар | **Без загрузки файлов** | В MVP — инициалы из `username`. Загрузка файлов вне скоупа |
+| 10 | Тип вопросов (Think) | **Только single-choice** | Один правильный из 4 вариантов, проверка детерминированная (сравнение с `correct_answer`). `q_type` и оценка открытых ответов убраны из MVP |
+| 11 | Комментарии в коде | **Минимум: код должен говорить сам** | Механический код поручаем Lombok: служебные классы — `@UtilityClass` (6.6), внедрение зависимостей — `@RequiredArgsConstructor` (6.7). Правила и обоснование — 6.5 |
+| 12 | Структура пакетов | **10 плоских пакетов по роли** | `entity`, `enums`, `repository`, `service`, `dto`, `exceptions`, `controller`, `config`, `security`, `utility`. Пакет отвечает на вопрос «какую роль играет класс», а не «в какой фиче он живёт»; вложенность (`byFeature`, `byLayer`) — когда появятся независимые модули. Таблица и направления зависимостей — 6.8 |
+| 13 | Имя сущности сессии | **`LearningSession`** (таблица `sessions`) | Чтобы не конфликтовать с `HttpSession` и `org.hibernate.Session` |
+| 14 | Восстановление пароля | **Вне скоупа** | Регистрация + вход + выход |
 
-### Архитектурные следствия решений
+### Следствия для архитектуры
 
-- Вся работа с ИИ изолирована за интерфейсом **`AiGateway`** — смена провайдера/endpoint не
-  ломает остальное приложение.
-- Есть **spring-profile `local`** со stub-реализацией `AiGateway` (предзаполненный контент без
-  API-ключа) — разработка и тесты работают офлайн.
-- Session — центральная сущность: хранит статус продвижения
-  `PROPOSED → READ → THINK → DISCUSS → DONE`, тему, текст, вопросы, переписку и результат.
-- Все данные привязаны к пользователю; на всех маршрутах `/sessions/{id}/...` — проверка владельца.
+- Вся работа с ИИ изолируется за интерфейсом **`AiGateway`** (Этап 5) — смена провайдера
+  или endpoint не ломает остальное приложение.
+- Для офлайн-разработки и тестов будет spring-profile **`local`** со stub-реализацией
+  `AiGateway` (предзаполненный контент без API-ключа) — Этап 5.
+- `LearningSession` — центральная сущность: статус продвижения
+  `PROPOSED → READ → THINK → DISCUSS → DONE`, тема, текст, вопросы, переписка, результат.
+- Все данные привязаны к пользователю; на маршрутах `/sessions/{id}/...` — проверка
+  владельца (Этап 10).
 
 ---
 
 ## 3. Текущее состояние проекта
 
-> Обновлять на старте каждой сессии: что уже есть в коде на сегодня.
+> Сверять с кодом при каждой сессии. Здесь — только то, что реально есть.
 
-**Базовый скелет + инфраструктура (выполнен Этап 1):**
-- Spring Boot **4.1.1** (parent), Java **21** (реальная JVM 23), Maven Wrapper (`./mvnw`).
-- `pom.xml`: thymeleaf, webmvc, **data-jpa**, **security**, **validation**,
-  `thymeleaf-extras-springsecurity6` (3.1.5), **Liquibase** (`spring-boot-starter-liquibase`
-  + `liquibase-core`), `postgresql` (runtime), **Spring AI 2.0.1**
-  (BOM + `spring-ai-starter-model-openai`), docker-compose, Lombok, тест-стартеры.
-- `compose.yaml`: **Postgres 17** (`textik`/`textik`, хост-порт **5433**, том, healthcheck).
-- `application.yaml`: datasource (env-переменные с дефолтами), `ddl-auto: validate`,
-  Liquibase на `classpath:db/changelog/db.changelog-master.yaml`,
-  плейсхолдеры `spring.ai.openai.*`.
-- `db/changelog/db.changelog-master.yaml` — только `include` файлов из
-  `db/changelog/changesets/`: `001-create-users`, `002-create-profiles`,
-  `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
-  `006-create-session-reviews` (все с `relativeToChangelogFile: true`).
-  Схема упрощена для MVP — нет индексов; убраны поля `proposals`, `avatar_url`,
-  `updated_at`, `display_name`, `created_at`/`finished_at` (sessions), `q_index`,
-  `answered_at`, `q_type` (и его CHECK). `users`: `email` (логин, unique) +
-  `username` (имя, отображается в профиле). `questions`: только single-choice —
-  `options` (JSONB, NOT NULL) + `correct_answer`. CHECK-ограничения на `level`,
-  `status`, `role` остались.
-- Приложение стартует (~8 с), Liquibase мигрирует, `/` закрыт авторизацией (свой `SecurityConfig`,
-  см. Этап 3).
-- **Этап 2 выполнен.** Доменная модель: пакет `entity` — `AppUser`, `Profile`, `LearningSession`,
-  `Question`, `ChatMessage`, `SessionReview`; пакет `enums` — `SessionStatus`, `ChatRole` (уровень
-  оставлен `String`, его валидность гарантируют CHECK-ограничения). Пакет `repository` — 6 интерфейсов
-  Spring Data JPA с derived-запросами под нужные экраны (в т.ч. `findByIdAndUserId` для проверки
-  владельца сессии и `countBySessionIdAndRole` для лимита обсуждения).
-  > Идентификаторы — `GenerationType.IDENTITY` (в БД `GENERATED BY DEFAULT AS IDENTITY`).
-  > JSONB-колонка `questions.options` маппится как `List<String>` через
-  > `@JdbcTypeCode(SqlTypes.JSON)`. TEXT-колонки помечены `columnDefinition = "text"` —
-  > без этого `ddl-auto: validate` ругается на расхождение `text` / `varchar(255)`.
-  > `session_reviews.created_at` — `Instant` (→ `timestamptz`), заполняется приложением.
+### 3.1 Инфраструктура (Этапы 0–1, выполнены)
+
+- Spring Boot **4.1.1** (parent), Java **21** в pom, Maven Wrapper (`./mvnw`).
+- `pom.xml`: `thymeleaf`, `webmvc`, `data-jpa`, `security`, `validation`,
+  `thymeleaf-extras-springsecurity6` (3.1.5), `spring-boot-starter-liquibase` + `liquibase-core`,
+  `postgresql` (runtime), **Spring AI 2.0.1** (BOM + `spring-ai-starter-model-openai`),
+  `docker-compose`, Lombok, тест-стартеры (`spring-boot-starter-webmvc-test`,
+  `spring-security-test`, `spring-boot-testcontainers`, `testcontainers-postgresql`).
+- `compose.yaml`: Postgres 17, БД/пользователь/пароль `textik`, том, healthcheck, порт **5433**.
+- `application.yaml`: datasource (env с дефолтами), `ddl-auto: validate`, `open-in-view: false`,
+  Liquibase на `classpath:db/changelog/db.changelog-master.yaml`, плейсхолдеры
+  `spring.ai.openai.*` (заполняются на Этапе 5). Три комментария в файле — только «почему».
+- `db/changelog/db.changelog-master.yaml` подключает `changesets/001-create-users`,
+  `002-create-profiles`, `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
+  `006-create-session-reviews`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
+  `avatar_url`, `updated_at`, `display_name`, `created_at`/`finished_at` (sessions), `q_index`,
+  `answered_at`, `q_type` (и его CHECK). Остались CHECK на `level`, `status`, `role`.
+  **Changeset-файлы 001–006 не редактируем** (сломается checksum) — только новые.
+- Приложение стартует ~8 с, Liquibase применяет миграции при старте.
+
+### 3.2 Домен (Этап 2, выполнен)
+
+- `entity` (6 JPA-сущностей): `AppUser` (email=логин, `username` — имя, bcrypt-хэш),
+  `Profile` («О себе», интересы, уровень), `LearningSession`, `Question` (single-choice),
+  `ChatMessage`, `SessionReview`.
+- `enums`: `SessionStatus`, `ChatRole` (USER/ASSISTANT). `QuestionType` не нужен — все вопросы
+  одного типа. Уровень оставлен `String`, валидность гарантируют CHECK-ограничения.
+- `repository`: 6 интерфейсов Spring Data JPA с derived-запросами под экраны, включая
+  `findByIdAndUserId` (проверка владельца сессии) и `countBySessionIdAndRole` (лимит обсуждения).
+- Особенности маппинга:
+  - `@GeneratedValue(strategy = IDENTITY)` (в БД `GENERATED BY DEFAULT AS IDENTITY`);
+  - `questions.options` — JSONB через `@JdbcTypeCode(SqlTypes.JSON)` → `List<String>`;
+  - текстовые колонки помечены `columnDefinition = "text"` — иначе `ddl-auto: validate`
+    ругается на расхождение `text` / `varchar(255)`;
+  - `session_reviews.created_at` — `Instant` (→ `timestamptz`), заполняется приложением;
+  - `Profile.userId` — assigned-id без ассоциации на `AppUser` (5.1, последний пункт).
 - `ddl-auto: validate` проходит: схема и сущности согласованы.
-- **Этап 3 выполнен.** Аутентификация на Spring Security 7 (form login + BCrypt, миграций не
-  потребовалось — колонки `users` уже подходят):
-  - пакет `config`: `SecurityConfig` (бин `PasswordEncoder`, `UserDetailsService` поверх
-    `AppUserRepository.findByEmailIgnoreCase`, `SecurityContextRepository`, `SessionAuthenticationStrategy`,
-    `SecurityFilterChain`); пакет `security`: `AppUserDetails` (record в сессии: `id`, `email`,
-    `displayName`, `passwordHash`; `getUsername()` = email по контракту, единственная роль `ROLE_USER`);
-  - пакет `service`: `UserRegistrationService` (нормализует email в нижний регистр, проверяет
-    занятость, кодирует пароль, ловит гонку по уникальному индексу); пакет `exceptions`:
-    `EmailAlreadyTakenException`;
-  - пакет `dto`: `RegistrationForm` (record с валидацией, пароль 8..72 символов + подтверждение);
-    пакет `controller`: `AuthController` (`GET/POST /register`, `GET /login`; внедрение зависимостей —
-    Lombok `@RequiredArgsConstructor`), `HomeController` (`GET /`, временный главный экран — на
-    Этапе 6 дорастёт);
-  - `templates/register.html`, `login.html`, `home.html` + `static/css/app.css`.
-  - **После регистрации пользователь сразу попадает на главный экран** (без второго ввода):
-    контроллер сам ставит аутентификацию в контекст и делает redirect.
-- **Тесты — 54 шт., `./mvnw test` зелёные за ~33 с:**
-  - 16 юнит-тестов домена без Spring и БД: `QuestionTests` (4), `SessionStatusTests` (5),
-    `LearningSessionTests` (7);
-  - 27 тестов репозиториев — отдельный класс на каждый репозиторий:
-    `AppUserRepositoryTests` (4), `ProfileRepositoryTests` (4), `SessionRepositoryTests` (6),
-    `QuestionRepositoryTests` (5), `ChatMessageRepositoryTests` (4), `SessionReviewRepositoryTests` (4);
-  - 10 тестов веб-слоя на MockMvc: `RegistrationTests` (6) и `LoginTests` (4);
-  - 1 smoke-тест `TextikV1ApplicationTests` (контекст поднимается, схема из миграций доступна).
-  - БД в тестах — Testcontainers (`postgres:17-alpine`), поднимать `docker compose` вручную
-    не нужно. Требования к тестам — раздел 6.
-  - Базовые классы: `PostgresRepositoryTest` (@DataJpaTest), `PostgresIntegrationTest`
-    (@SpringBootTest + контейнер), `WebTest` (то же + MockMvc).
-- Сценарий проверен и на живом приложении (`spring-boot:run` + `curl` с cookie-jar):
-  аноним → 302 на `/login`; регистрация → 302 на `/` и «Привет, Sergey!»; повторный email и
-  несовпадение паролей → форма с русской ошибкой; неверный пароль → `/login?error`; выход →
-  `/login?logout`, после него `/` снова 302 на `/login`.
-- **Отсутствуют**: онбординг и профиль (Этап 4), слой ИИ с `AiGateway` и профилем `local`
-  (Этап 5), главный экран (Этап 6), экраны вопросов / обсуждения / ревью, страница прогресса.
-- **Комментариев в Java-коде нет** — смысл несут имена и структура (правило раздела 6.5).
-  В `application.yaml` остались 3 пояснения «почему, а не что» (плейсхолдеры
-  `spring.ai.openai.*` — без них контекст не поднимается).
 
-**Чек-лист статуса задач** — см. раздел 4, отмечать `[x]` по мере выполнения.
+### 3.3 Аутентификация (Этап 3, выполнен)
+
+Spring Security 7, form login + BCrypt, миграции не потребовались — колонки `users` уже подходят.
+
+| Файл | Содержимое |
+|------|------------|
+| `config/SecurityConfig` | бины `PasswordEncoder` (BCrypt), `UserDetailsService` (поверх `AppUserRepository.findByEmailIgnoreCase`), `SecurityContextRepository` (`HttpSessionSecurityContextRepository`), `SessionAuthenticationStrategy` (`ChangeSessionIdAuthenticationStrategy`), `SecurityFilterChain` |
+| `security/AppUserDetails` | record в сессии: `id`, `email`, `displayName`, `passwordHash`; `getUsername()` = email по контракту; единственная роль `ROLE_USER` |
+| `service/UserRegistrationService` | нормализует email в нижний регистр, проверяет занятость, кодирует пароль, ловит гонку по уникальному индексу |
+| `exceptions/EmailAlreadyTakenException` | Бизнес-ошибка «email уже занят» |
+| `dto/RegistrationForm` | record: email, имя, пароль 8..72 символов + подтверждение (верхняя граница — лимит BCrypt в 72 байта) |
+| `controller/AuthController` | `GET /register`, `POST /register`, `GET /login`; внедрение зависимостей — Lombok `@RequiredArgsConstructor` |
+| `controller/HomeController` | `GET /` — временный главный экран («Привет, <имя>!»), на Этапе 6 дорастёт |
+| `resources/templates` | `register.html`, `login.html`, `home.html` + `static/css/app.css` |
+
+Поведение: **email = логин** (`.usernameParameter("email")`, 5.1); после регистрации —
+сразу главный экран, без второго ввода (контекст ставит контроллер, id сессии меняет
+`SessionAuthenticationStrategy` — 5.1). Открыты `/register`, `/login`, `/css/**`, `/error`,
+остальное за авторизацией; CSRF включён; ролей не заводили — у всех `ROLE_USER`. Все сообщения
+валидации и ошибок — русские.
+
+### 3.4 Тесты — 54, `./mvnw test` зелёные (~30 с)
+
+| Слой | Классы | Тестов |
+|------|--------|--------|
+| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
+| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4 | 10 |
+| Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
+
+- Базовые классы в `support/`: `PostgresRepositoryTest` (`@DataJpaTest`), `PostgresIntegrationTest`
+  (`@SpringBootTest` + контейнер + профиль `test`), `WebTest` (`+ @AutoConfigureMockMvc`),
+  `PostgresTestConfiguration` (контейнер как Spring-бин), `TestFixtures` (фабрики данных).
+- Требования к тестам — 6.1–6.4.
+
+### 3.5 Проверено на живом приложении
+
+`spring-boot:run` + `curl` с cookie-jar: аноним → 302 на `/login`; регистрация → 302 на `/`
+и «Привет, Sergey!»; повторный email и несовпадение паролей → форма с русской ошибкой;
+неверный пароль → `/login?error`; выход → `/login?logout`, после него `/` снова 302 на `/login`.
+CSRF-токен после входа перевыпускается (5.1).
+
+### 3.6 Чего ещё нет
+
+- Онбординг, профиль, прогресс (Этап 4).
+- Слой ИИ: `AiGateway`, DTO structured output, промпты, stub для профиля `local` (Этап 5).
+- Главный экран с плашками этапов, выбор темы, чтение (Этап 6); вопросы (7), обсуждение (8),
+  ревью (9).
+- Восстановление пароля, аватар с загрузкой, статистика между сессиями — вне скоупа MVP.
 
 ---
 
 ## 4. План задач по этапам
 
-### Этап 0. Проверка заготовки
-- [x] Убедиться, что проект собирается: `./mvnw compile` и `./mvnw test`.
-- [x] `mvn test` зелёный, приложение стартует.
+### Этап 0. Проверка заготовки — выполнен
+- [x] `./mvnw compile` и `./mvnw test` проходят; приложение стартует.
 
-### Этап 1. Инфраструктура: зависимости + Postgres + конфиг
-- [x] `pom.xml`: добавить `spring-boot-starter-data-jpa`,
-      `spring-boot-starter-security`, `spring-boot-starter-validation`,
-      `org.postgresql:postgresql` (runtime), **`spring-boot-starter-liquibase`**
-      (+ `liquibase-core`), `thymeleaf-extras-springsecurity6`,
-      **Spring AI 2.0.1**: BOM + `spring-ai-starter-model-openai`.
-      > Важно (Boot 4): `spring-boot-autoconfigure` НЕ содержит Security/JPA
-      > автоконфигурации — они в отдельных стартерах (аналогично в Boot 4 микграции:
-      > `spring-boot-starter-flyway` / `spring-boot-starter-liquibase`).
-      > В liquibase-core 5.0.x нет change type `addCheckConstraint` → CHECK-ограничения
-      > добавляются через `sql`-изменения в YAML-changelog.
-      > Spring AI OpenAI-стартер падает на старте без непустого `api-key`.
-- [x] `compose.yaml`: сервис `postgres:17`, БД `textik`, пользователь/пароль, том, healthcheck.
-      > Хост-порт **5433** (на машине уже занимает 5432 локальный Postgres).
-- [x] `application.yaml`: datasource (url/username/password), JPA
-      (`ddl-auto: validate`, `open-in-view: false`), Liquibase
-      (`change-log: classpath:db/changelog/db.changelog-master.yaml`),
-      `spring.ai.openai.*` — плейсхолдеры `YANDEX_AI_API_KEY` / `YANDEX_AI_BASE_URL` /
-      `YANDEX_AI_MODEL` (заполнить на Этапе 5).
-- [x] Миграция `db/changelog/db.changelog-master.yaml` (YAML-формат): таблицы `users`,
-      `profiles`, `sessions`, `questions`, `chat_messages`, `session_reviews`.
-- [x] Проверка: `docker compose up -d` → `./mvnw spring-boot:run` → приложение стартует
-      (~5 с), Liquibase применяет changelog (таблицы + `databasechangelog`), схема создаётся.
-      > Без `SecurityConfig` запрос к `/` возвращает 401 (дефолтный Spring Security) —
-      > ожидаемо до Этапа 3.
+### Этап 1. Инфраструктура: зависимости + Postgres + конфиг — выполнен
+- [x] Зависимости в `pom.xml`, `compose.yaml` (Postgres 17, порт 5433), `application.yaml`,
+      Liquibase-миграции `001`–`006` (схема — 3.1).
 
-### Этап 2. Доменная модель
-- [x] Сущности JPA: `AppUser` (email=логин, `username` — имя, bcrypt-пароль),
-      `Profile` («О себе», интересы, уровень A1/A2/B1),
-      `LearningSession` (статус PROPOSED→READ→THINK→DISCUSS→DONE, уровень, тема, описание, текст),
-      `Question` (prompt, варианты → `options`, правильный ответ, объяснение, ответ юзера, флаг корректности),
-      `ChatMessage` (роль/контент), `SessionReview` (результаты).
-- [x] Enums: `SessionStatus`, `ChatRole` (USER/ASSISTANT). Все вопросы — единый тип
-      single-choice (один правильный из 4), поэтому `QuestionType` не нужен.
-- [x] Репозитории Spring Data JPA.
-- [x] Проверка: компиляция, связи через `user_id`.
-      > `./mvnw test` — зелёные; на момент закрытия этапа было 4 теста, сейчас вся база — 44
-      > (см. раздел 3 и требования к тестам в разделе 6). `ddl-auto: validate` проходит.
+### Этап 2. Доменная модель — выполнен
+- [x] 6 сущностей, 2 enum, 6 репозиториев, 16 юнит-тестов домена (3.2).
 
-### Этап 3. Аутентификация
-- [x] `SecurityConfig`: form login `/login`, регистрация открыта, остальное за авторизацией,
-      BCrypt, CSRF включён (дефолт).
-- [x] `register.html` + контроллер регистрации (email + `username` + пароль + подтверждение,
-      пароль 8..72 символа — верхняя граница ограничена лимитом BCrypt в 72 байта).
-- [x] `login.html`, логаут (`POST /logout`).
-- [x] Проверка: регистрация → вход → выход; без входа — редирект на логин.
-      > 10 тестов на MockMvc (`RegistrationTests`, `LoginTests`) + ручная проверка живого
-      > приложения через `curl` (все коды и редиректы верные, см. раздел 3).
-      > Права не заводили: колонки роли в БД нет, у всех пользователей одна роль `ROLE_USER`.
-      > Восстановление пароля в скоуп не входит (раздел 5).
+### Этап 3. Аутентификация — выполнен
+- [x] Form login, BCrypt, регистрация с автологином, выход, 10 тестов MockMvc + ручная
+      проверка живого приложения (3.3, 3.4).
 
 ### Этап 4. Онбординг + профиль + прогресс (каркас)
-- [ ] Онбординг: «О себе», интересы (через запятую), уровень (A1/A2/B1).
-      Имя задаётся при регистрации (`username`) и показывается в профиле.
-      После входа без профиля → редирект на онбординг.
-- [ ] Профиль: просмотр + редактирование всех полей.
-- [ ] Прогресс: профиль + история сессий (пустой список, данные появятся на Этапе 9).
+- [ ] Онбординг: «О себе», интересы (через запятую), уровень (A1/A2/B1). Имя задаётся при
+      регистрации (`username`) и показывается в профиле. После входа без профиля → редирект
+      на онбординг.
+- [ ] Профиль: просмотр + редактирование всех полей. Учесть: `Profile` грузится по `userId`
+      из репозитория, навигации `user.getProfile()` нет (5.1).
+- [ ] Прогресс: профиль + история сессий (пока пустой список; данные появятся на Этапе 9).
 - [ ] Проверка: онбординг обязателен, редактирование сохраняется.
 
 ### Этап 5. Слой ИИ (AiGateway)
-- [ ] Интерфейс `AiGateway` + DTO structured output: `TopicProposal`, `GeneratedText`,
-      `GeneratedQuestion`, `ReviewData`.
-- [ ] Методы: `generateProposals`, `generateText`, `generateQuestions`,
-      `continueDiscussion`, `generateReview`.
+- [ ] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
+      `GeneratedText`, `GeneratedQuestion`, `ReviewData`.
+- [ ] Методы: `generateProposals`, `generateText`, `generateQuestions`, `continueDiscussion`,
+      `generateReview`.
 - [ ] Реализация через Spring AI `ChatClient` (OpenAI-стартер → endpoint Яндекса),
-      распарсинг JSON через Structured Output.
+      Structured Output.
 - [ ] Промпты:
       1. 3 идеи тем по интересам/уровню → экран выбора;
       2. полный текст 350–500 слов под уровень;
@@ -222,18 +215,22 @@
       4. обсуждение — системный промпт «держимся темы, возвращаем ушедшего», лимит 3–5 обменов;
       5. ревью — резюме, частые ошибки, оценка уровня разговора.
 - [ ] **Stub-реализация** (`@Profile("local")`) без API-ключа.
-- [ ] Проверка: с `local` — полный цикл офлайн; с настоящим ключом Яндекс — живой вызов.
+- [ ] Проверка: с `local` — полный цикл офлайн; с настоящим ключом Яндекса — живой вызов.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
 - [ ] Home: название приложения, 4 плашки этапов с временем + «Начать сессию».
-- [ ] Создание сессии → генерация 3 тем → `select.html` (карточки: название + описание + «Начать чтение»).
-- [ ] Выбор темы → генерация полного текста → `read.html` (название, описание, текст, «К вопросам»).
+- [ ] Создание сессии → генерация 3 тем → `select.html` (карточки: название + описание +
+      «Начать чтение»). Три предложения хранятся в HTTP-сессии: `sessions.proposals` в БД нет,
+      обновление страницы перегенерирует их (осознанный MVP-трейдофф, 5.1).
+- [ ] Выбор темы → генерация полного текста → `read.html` (название, описание, текст,
+      «К вопросам»).
+- [ ] Пересмотреть layout-фрагмент (5) — экранов станет 8+.
 - [ ] Проверка: «Начать сессию» → 3 темы → читаем текст.
 
 ### Этап 7. Вопросы (Think)
 - [ ] Генерация 5–10 вопросов при переходе «К вопросам», сохранение в `questions`.
-- [ ] Экран по одному вопросу; после ответа — детерминированная проверка
-      (сравнение выбранного варианта с `correct_answer`).
+- [ ] Экран по одному вопросу; после ответа — детерминированная проверка (сравнение
+      выбранного варианта с `correct_answer`).
 - [ ] При неверном ответе — объяснение. В конце — «К обсуждению».
 - [ ] Проверка: отвечаю на все вопросы, видны объяснения, ведётся счёт правильно/неправильно.
 
@@ -244,17 +241,18 @@
 - [ ] Проверка: отвлекаюсь от темы — ИИ возвращает к тексту; после лимита доступно ревью.
 
 ### Этап 9. Ревью (Review)
-- [ ] `generateReview()`: резюме, число ошибок в тестах, оценка уровня разговора,
-      разбор основных ошибок.
+- [ ] `generateReview()`: резюме, число ошибок в тестах, оценка уровня разговора, разбор
+      основных ошибок.
 - [ ] `review.html`: поздравление + результаты + «На главный экран».
 - [ ] Сохранение в `session_reviews`, статус сессии → DONE, попадание в историю.
-- [ ] «Прогресс» показывает реальную историю сессий.
+- [ ] «Прогресс» показывает реальную историю сессий (сортировка по `id` — дат у сессий нет,
+      5.1).
 - [ ] Проверка: полный круг Read→Think→Discuss→Review, итоги в истории.
 
 ### Этап 10. Доводка и защита
 - [ ] Проверка владельца сессии на всех `/sessions/{id}/...` (чужая → 404/403).
-- [ ] Обработка ошибок ИИ: таймауты, ретраи, понятное сообщение + повтор,
-      защита от дублирующей генерации.
+- [ ] Обработка ошибок ИИ: таймауты, ретраи, понятное сообщение + повтор, защита от
+      дублирующей генерации.
 - [ ] Загрузочные состояния, валидация форм.
 - [ ] Тесты: проверка ответа, проверка владельца, генерация через stub.
 - [ ] README: как получить ключ Яндекса, какие поля конфига заполнить.
@@ -262,267 +260,209 @@
 
 ---
 
-## 5. Открытые вопросы / заметки
+## 5. Открытые вопросы
 
-- [ ] Выбрать конкретную модель Яндекса и получить API-ключ в Yandex Cloud;
-      подтвердить точный OpenAI-совместимый `base-url` и имя `model`.
-- [ ] Аватар: MVP — инициалы/URL, загрузка файлов позже.
-- [ ] Аутентификация (уже в MVP): восстановление пароля НЕ входит в скоуп.
+- [ ] Выбрать конкретную модель Яндекса и получить API-ключ в Yandex Cloud; подтвердить точный
+      OpenAI-совместимый `base-url` и имя `model` (блокирует Этап 5).
 - [ ] Прогресс между сессиями пользователя (статистика по времени, «выучено слов» и т.п.) —
       вне скоупа MVP, кандидаты на следующую итерацию.
-- [x] Уточнить актуальное имя артефакта Thymeleaf-security-extras под Spring Boot 4 —
-      **решено**: `thymeleaf-extras-springsecurity6` (3.1.5.RELEASE, управляется Boot).
-- [x] Liquibase разделён на отдельные changeset-файлы (включение через `include` в master);
-      схема упрощена для MVP: убраны `proposals`, `avatar_url`, `updated_at`,
-      `created_at`/`finished_at` (sessions), `q_index`, `answered_at`, индексы, а затем и
-      `display_name` (его роль играет `username`) и `q_type` (все вопросы — single-choice).
-      Следствие: экран выбора тем держит 3 предложения в памяти запроса — обновление
-      страницы перегенерирует их заново (осознанный MVP-трейдофф).
-- [x] Git-репозиторий инициализирован (ветка `master`), первый коммит сделан
-      («Этап 0-1: инфраструктура»), 18 файлов.
-- [x] **`profiles.user_id` — общий первичный ключ (PK = FK на `users.id`) несовместим
-      с Spring Data JPA** — выяснено экспериментально на Этапе 2:
-      (1) вариант «`@Id` + `@MapsId`» → Hibernate 7: *«Identifier of entity 'Profile' must be
-      manually assigned before calling 'persist()'»*;
-      (2) вариант «ассоциация как `@Id`» → Spring Data: *«This class does not define an IdClass»*.
-      **Решено:** маппим `user_id` как обычный assigned-id (`Long userId`), без ассоциации
-      `Profile ↔ AppUser`; профиль берётся как `profileRepository.findById(currentUserId)`,
-      создаётся как `Profile.of(userId, ...)`. Каскада и `orphanRemoval` между ними нет —
-      удаление профиля делает `ON DELETE CASCADE` в БД.
-      **Следствие для UI:** навигации `user.getProfile()` нет, профиль всегда грузится
-      из репозитория (один лишний SELECT — не страшно).
-      Если позже понадобится объектный граф `user.getProfile()` — вариант: changeset 007
-      с отдельным `id BIGINT GENERATED ... IDENTITY` в `profiles` + `UNIQUE (user_id)`.
-      Уже применённые changeset-файлы 001–006 не трогаем (иначе сломается checksum).
-- [x] Сущность сессии названа `LearningSession` (таблица `sessions`), чтобы не конфликтовать
-      с `jakarta.servlet.http.HttpSession` и `org.hibernate.Session` — на Этапе 6 «3 предложения
-      тем» планируется хранить в HTTP-сессии.
-- [ ] **Отсутствие дат у сессии:** changeset-файл 003 не содержит `created_at`/`finished_at`
-      (упрощение MVP), поэтому историю в «Прогрессе» (Этап 4/9) придётся сортировать по `id`
-      и показывать без дат. Если понадобятся даты — новый changeset 007 `ALTER TABLE sessions
-      ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`.
-- [x] **`src/test/resources/application.yaml` затеняет боевой конфиг** — выяснено при переходе
-      на Testcontainers: одноимённый файл в `src/test/resources` полностью перекрывает
-      `src/main/resources/application.yaml`, из-за чего в тестах пропадали `spring.ai.openai.*`
-      и контекст падал с *«At least one credential source must be specified»*.
-      **Решено:** тестовые настройки только в `application-test.yaml` + `@ActiveProfiles("test")`.
-      Если файл удалить — чистить `target/test-classes` (Maven не удаляет старые ресурсы).
-- [x] **Тесты на Testcontainers:** контейнер `postgres:17-alpine` объявлен Spring-бином
-      (`PostgresTestConfiguration`) с `@ServiceConnection`, а не полем `@Container` —
-      контекст кэшируется, контейнер поднимается один раз на набор `@DataJpaTest`-классов.
-      Первый запуск скачивает образ и `testcontainers/ryuk:0.14.0` — дальше быстро.
-- [x] **Boot 4: тесты веб-слоя.** MockMvc даёт `spring-boot-starter-webmvc-test` (он уже в
-      `pom.xml`), а `@AutoConfigureMockMvc` лежит в пакете `org.springframework.boot.webmvc.test.autoconfigure`
-      (как и `@DataJpaTest` — в `...boot.data.jpa.test.autoconfigure`). Для аутентификации в тестах
-      добавлен `org.springframework.security:spring-security-test` (`csrf()`, `authenticated()`).
-- [x] **Логин по email, а не по username:** `UsernamePasswordAuthenticationFilter` ждёт параметр
-      `username`, поэтому в `SecurityConfig` указано `.usernameParameter("email")` — поле формы
-      так и называется, менять пришлось бы только при переименовании.
-- [x] **Автологин после регистрации — официальный приём Spring Security:** контроллер сам собирает
-      `UsernamePasswordAuthenticationToken.authenticated(...)` и сохраняет контекст через
-      `SecurityContextRepository` (бин `HttpSessionSecurityContextRepository`, он же используется
-      фильтром — без бина контекст из сессии не читался бы). Перед сохранением вызывается
-      `SessionAuthenticationStrategy` (`ChangeSessionIdAuthenticationStrategy`) — смена id сессии,
-      защита от session fixation, как при входе через форму.
-- [x] **Spring Security 7: `MessageSourceDelegatingAuthenticationFailureHandler` удалён**, поэтому
-      «Неверный email или пароль» переопределить через message source нельзя. Не нужно: текст ошибки
-      рисует наш `login.html` по флагу `?error`.
-- [x] **CSRF-токен перевыпускается при успешном входе** — выяснено при ручной проверке через
-      `curl`: `POST /logout` со старым токеном отдаёт 403 `Invalid CSRF token`, со свежим —
-      302 на `/login?logout`. В MockMvc-тестах этого не видно, там токен подставляется на каждый
-      запрос (`with(csrf())`). Форма Thymeleaf подставляет скрытое поле `_csrf` сама
-      (проверено: в `register.html` поле присутствует).
-- [ ] **Шаблон-обёртка (layout-фрагмент) пока не заводили:** на трёх страницах дублируется
-      `<head>`, но фрагмент, принимающий кусок разметки параметром, читается неочевидно.
-      Решение пересмотреть на Этапе 6, когда экранов станет 8+ и дублирование начнёт мешать.
+- [ ] Шаблон-обёртка (layout-фрагмент) пока не заводили: на трёх страницах дублируется `<head>`,
+      но фрагмент, принимающий кусок разметки параметром, читается неочевидно. Пересмотреть на
+      Этапе 6, когда экранов станет 8+.
+
+### 5.1 Принятые технические решения (не пересматривать)
+
+- **Changeset-файлы 001–006 не трогаем** — иначе сломается checksum. Новые изменения — новыми
+  файлами (нумерация с 007).
+- **`src/test/resources/application.yaml` заводить нельзя** — одноимённый файл затеняет
+  `src/main/resources/application.yaml`, в тестах пропадают `spring.ai.openai.*`, и контекст падает
+  с «At least one credential source must be specified». Тестовые настройки — только
+  `application-test.yaml` + `@ActiveProfiles("test")`. Если файл всё-таки создадут — чистить
+  `target/test-classes` (Maven не удаляет старые ресурсы).
+- **Testcontainers поднимается как Spring-бин** (`PostgresTestConfiguration` +
+  `@ServiceConnection`), а не полем `@Container`: контекст кэшируется, контейнер один на набор
+  тестов. В `pom.xml` есть неиспользуемый `testcontainers-junit-jupiter` — `@Container` применять
+  не нужно. Первый запуск скачивает образ и `testcontainers/ryuk`, дальше быстро.
+- **Boot 4: автоконфигурация разъехалась по отдельным стартерам** —
+  `spring-boot-autoconfigure` не содержит Security/JPA. В тестах MockMvc даёт
+  `spring-boot-starter-webmvc-test`, `@AutoConfigureMockMvc` лежит в
+  `org.springframework.boot.webmvc.test.autoconfigure`, `@DataJpaTest` — в
+  `...boot.data.jpa.test.autoconfigure`; аутентификация — `spring-security-test` (`csrf()`,
+  `authenticated()`).
+- **Liquibase 5.0.x: change type `addCheckConstraint` отсутствует** — CHECK-ограничения
+  добавляются через `sql`-изменения в YAML-changelog.
+- **Spring AI OpenAI-стартер не поднимается без непустого `api-key`** — в `application.yaml`
+  стоят плейсхолдеры.
+- **Логин по email, а не по `username`:** фильтр ждёт параметр `username`, поэтому в
+  `SecurityConfig` указано `.usernameParameter("email")` — при переименовании поля формы
+  придётся менять и его.
+- **Автологин после регистрации** — официальный приём Spring Security: контроллер сохраняет
+  контекст через бин `SecurityContextRepository` (без бина фильтр не прочитал бы контекст из
+  сессии) и вызывает `SessionAuthenticationStrategy` — защита от session fixation.
+- **В Spring Security 7 `MessageSourceDelegatingAuthenticationFailureHandler` удалён** — текст
+  ошибки входа не переопределяется через message source; «Неверный email или пароль» рисует
+  наш `login.html` по флагу `?error`.
+- **CSRF-токен перевыпускается при успешном входе** — `POST /logout` со старым токеном отдаёт
+  403, со свежим — 302 на `/login?logout`. В MockMvc это не видно (`with(csrf())` подставляет
+  токен на каждый запрос), Thymeleaf подставляет скрытое поле `_csrf` сам.
+- **Схема упрощена под MVP:** `sessions.proposals` нет (темы хранятся в HTTP-сессии),
+  `sessions.created_at`/`finished_at` нет (история сортируется по `id`; нужны даты — changeset
+  007 `ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`), `q_type` нет (все вопросы
+  single-choice), `users.display_name` нет (роль играет `username`).
+- **`Profile` не связан ассоциацией с `AppUser`:** `profiles.user_id` — общий PK (PK = FK на
+  `users.id`), что несовместимо со Spring Data JPA («must be manually assigned before persist()»
+  и «This class does not define an IdClass»). **Решено:** `user_id` — assigned-id
+  (`Long userId`), профиль берётся из `profileRepository.findById(currentUserId)`, каскада нет
+  (удаление профиля делает `ON DELETE CASCADE` в БД). Понадобится `user.getProfile()` — changeset
+  007 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
 
 ---
 
 ## 6. Требования к коду и тестам
 
-### 6.1. Читаемость
+### 6.1 Читаемость тестов
 
-1. **Русские `@DisplayName` на каждом тестовом классе и каждом методе.** Имена методов и
-   классов остаются английскими. Текст метода начинается с
-   `Тест, в котором мы проверяем, что ...` и описывает именно проверяемое поведение,
-   а не код: не «проверяем findByEmail», а «проверяем, что пользователь находится по email».
-2. **Комментарии `//Arrange`, `//Act`, `//Assert`** — без пробела после `//`, в таком же порядке,
-   как в Arrange/Act/Assert. Это разметка структуры теста, а не пояснение кода; других комментариев
-   в тестах по умолчанию тоже нет (раздел 6.5).
-   **Пустой этап — не пишем комментарий вообще.** Если в `Arrange` нечего подготовить (тест сразу
-   делает один запрос), то строки `//Arrange` и пустой строки после неё в тесте нет: остаётся
-   `//Act` и, возможно, `//Assert`. Проверено на Этапе 3: пустые `//Arrange` были в
-   `RegistrationTests` (2 теста) и `LoginTests` (1 тест) — удалены.
-   > Проверка перед коммитом: `for f in $(grep -rl '//Arrange' src/test/java); do awk '/^[[:space:]]*\/\/Arrange[[:space:]]*$/{getline l; if (l ~ /^[[:space:]]*$/) print FILENAME":"NR}' "$f"; done`
-   > — не должна ничего выводить.
-3. **Один тест — одно поведение**, до ~3 ассертов. Если проверок много, это несколько тестов.
-4. Тест не повторяет структуру продакшн-кода: юнит-тест домена собирает нужное состояние
-   напрямую, интеграционный — через публичные методы сущности.
+1. **Русский `@DisplayName` на каждом тестовом классе и каждом методе.** Имена классов и методов
+   — английские. Текст начинается с `Тест, в котором мы проверяем, что ...` и описывает
+   поведение, а не код: не «проверяем findByEmail», а «проверяем, что пользователь находится
+   по email».
+2. **Комментарии `//Arrange`, `//Act`, `//Assert`** (без пробела после `//`) — единственная
+   разрешённая разметка в тестах. **Пустой этап не размечается:** если в `Arrange` нечего
+   подготовить, строки `//Arrange` и пустой строки после неё нет — остаётся `//Act` и,
+   возможно, `//Assert`. Проверка перед коммитом (должна молчать):
+   `for f in $(grep -rl '//Arrange' src/test/java); do awk '/^[[:space:]]*\/\/Arrange[[:space:]]*$/{getline l; if (l ~ /^[[:space:]]*$/) print FILENAME":"NR}' "$f"; done`
+3. **Один тест — одно поведение**, до ~3 ассертов; если проверок много — это несколько тестов.
+4. Тест не повторяет структуру продакшн-кода: юнит-тест домена собирает состояние напрямую,
+   интеграционный — через публичные методы сущности.
 
-### 6.2. Слои тестов
+### 6.2 Слои тестов
 
-| Слой | Что тестируем | Как запускаем | Скорость |
-|------|---------------|---------------|----------|
-| Юнит | Доменная логика: `SessionStatus.next()`, `Question.answer()`, `LearningSession.userTurns()` | Чистый JUnit 5 + AssertJ, без Spring и БД | Миллисекунды |
-| Репозитории | Запросы Spring Data, маппинг, JSONB, `ddl-auto: validate` через схему | `@DataJpaTest` + Testcontainers | ~0.1–3 с на класс |
-| Сервисы (Этап 3+) | Бизнес-логика, переходы статусов | `@SpringBootTest` + Testcontainers, внешние API заглушены | Секунды |
-| Smoke | Контекст приложения поднимается, схема из миграций доступна | `@SpringBootTest` + Testcontainers | ~12 с |
+| Слой | Что тестируем | Как запускаем |
+|------|---------------|---------------|
+| Юнит | Доменная логика: `SessionStatus.next()`, `Question.answer()`, `LearningSession.userTurns()` | Чистый JUnit 5 + AssertJ, без Spring и БД |
+| Репозитории | Запросы Spring Data, маппинг, JSONB, согласие схемы и сущностей (`ddl-auto: validate`) | `@DataJpaTest` + Testcontainers |
+| Сервисы (с Этапа 5) | Бизнес-логика, переходы статусов | `@SpringBootTest` + Testcontainers, ИИ заглушен |
+| Веб (MockMvc) | Роуты, валидация форм, редиректы, CSRF | `WebTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`) |
+| Smoke | Контекст поднимается, схема из миграций доступна | `@SpringBootTest` + Testcontainers |
 
 - **Один класс на репозиторий**, имя `<Репозиторий>Tests`; базовый класс
   `PostgresRepositoryTest` собирает `@DataJpaTest` + Liquibase + Testcontainers + профиль `test`.
-- **Внешние вызовы (LLM) не ходят в сеть** — заглушка `AiGateway` / Mockito на границе сервиса.
+- **Внешние вызовы (LLM) в тестах не ходят в сеть** — заглушка `AiGateway` или Mockito на
+  границе сервиса.
 
-### 6.3. Изоляция данных
+### 6.3 Изоляция данных
 
-- **Никакого ручного `@Transactional` на тестовых классах.** Rollback, встроенный в
-  `@DataJpaTest`, остаётся — это его штатный механизм.
-- В сервисных тестах (`@SpringBootTest`) транзакционного rollback нет, поэтому данные
-  делаем **уникальными**: email через UUID (`TestFixtures.randomEmail`), никаких фиксированных
-  значений, на которые мог бы повлиять другой тест.
-- Общие фикстуры — в `TestFixtures` и в самих сущностях (фабричные методы
-  `of(...)`, `proposed(...)`), а не копипаст в каждом тесте.
+- **Никакого ручного `@Transactional` на тестовых классах** — rollback внутри `@DataJpaTest`
+  встроенный, это его штатный механизм.
+- В тестах на `@SpringBootTest` rollback не работает, поэтому данные делаем **уникальными**:
+  email через `TestFixtures.randomEmail()`, никаких фиксированных значений, на которые мог бы
+  повлиять другой тест.
+- Общие фикстуры — в `TestFixtures` и в самих сущностях (фабричные `of(...)`, `proposed(...)`),
+  а не копипаст в каждом тесте.
 - Тесты не зависят от порядка выполнения и не делят состояние.
-### 6.4. БД в тестах
+
+### 6.4 БД в тестах
 
 - Тесты поднимают **свой** Postgres в Testcontainers (`postgres:17-alpine`) через
-  `@ServiceConnection`; `docker compose up` вручную не нужен, состояние контейнера
-  не влияет на результат.
-- `docker compose` в тестах отключён: `spring.docker.compose.enabled: false` в
-  `application-test.yaml`.
-- Схема приходит из Liquibase (те же changeset-файлы, что и в проде) — это дополнительно
-  проверяет, что миграции и сущности согласованы. Правки changeset-файлов 001–006 запрещены
-  (сломается checksum) — только новые файлы.
+  `@ServiceConnection`; состояние контейнера `docker compose` на результат не влияет, а сам
+  compose в тестах отключён (`spring.docker.compose.enabled: false` в `application-test.yaml`).
+- Схема приходит из Liquibase — те же changeset-файлы, что и в проде, поэтому тесты заодно
+  проверяют, что миграции и сущности согласованы.
 
-### 6.5. Комментарии: почему их почти нет
+### 6.5 Комментарии: почему их почти нет
 
-_Правило действует на весь код проекта, а не только на тесты._
-
-**Комментарии — одна из причин технического долга.** Комментарий не компилируется и не
-проверяется: он устаревает при первой же правке кода, дублирует то, что уже видно, и создаёт
-иллюзию понимания — «прочитал комментарий, разобрался», хотя имя метода по-прежнему ничего
-не говорит. Через полгода такой комментарий активно врёт, и читатель уже не знает, кому верить.
-
-Поэтому **в коде комментариев минимум, а читаемость обеспечивается кодом и именами**:
+Правило действует на весь проект, а не только на тесты. Комментарий не компилируется и не
+проверяется: он устаревает при первой правке, дублирует видимое в коде и создаёт иллюзию
+понимания. Вместо комментария — имя, маленький метод, ясная структура.
 
 | Вместо комментария | Что делаем |
 |--------------------|-----------|
-| `// проверяем, что статус следующий` | Имя теста и `@DisplayName` уже говорят это: `goesToRead` / «Тест, в котором мы проверяем, что чтение переходит к вопросам» |
+| `// проверяем, что статус следующий` | Имя теста и `@DisplayName`: `goesToRead` / «Тест, в котором мы проверяем, что чтение переходит к вопросам» |
 | `// считаем количество правильных ответов` | Имя метода: `countBySessionIdAndIsCorrectFalse` |
-| `// увеличиваем счётчик, если ответ верный` | Имя метода: `marksCorrectAnswer()` |
-| `// здесь костыль, потому что ...` | Рефакторинг: убрать костыль; если нельзя — короткий комментарий **почему**, с указанием, что будет удалено |
-| `// user_id — общий PK, поэтому ...` | Решение и его причина уже зафиксированы в разделе 5 этого файла |
+| `// здесь костыль, потому что ...` | Рефакторинг, чтобы «почему» исчезло; если нельзя — короткий комментарий **почему**, с указанием, что будет удалено |
+| Рассуждения, «TODO на Этапе N», значения констант | Живут здесь, в `PROJECT_PLAN.md` (5.1) — там актуализируются централизованно |
 
-**Правила:**
+Правила:
 
-1. Комментарий не пересказывает код. Если его можно убрать, не потеряв смысла, — убираем.
-2. Вместо «что делает» — улучшаем имя. Вместо «почему так» — рефакторим, чтобы «почему»
-   исчезло; если нельзя, пишем **одну** строку «почему», без пересказа.
-3. Комментарий, который легко устареет (значения, «TODO на Этапе N», рассуждения), живёт
-   не в коде, а здесь, в `PROJECT_PLAN.md` — там он актуализируется централизованно.
-4. Тесты: единственная сознательная разметка — `//Arrange //Act //Assert` (пункт 6.1), она
-   структурная и удалять её не нужно; никаких других комментариев в тестах не пишем.
-   Разметку ставим **только на непустых этапах**: пустой `//Arrange` — это шум в чистом виде,
-   он ничего не размечает и учит читателя искать подготовку, которой нет.
-5. Конфиги (`application.yaml`, `compose.yaml`, changelog): допустимы короткие пояснения
-   «почему, а не что» — там нет имён, объясняющих намерение. Пересказ свойств не пишем.
-6. Разработчик **обязан** удалять комментарии, которые стал неактуальны, вместе с правкой кода:
+1. Комментарий не пересказывает код: если его можно убрать, не потеряв смысл, — убираем.
+2. Вместо «что делает» — улучшаем имя; вместо «почему так» — рефакторим.
+3. В тестах допустимы только `//Arrange //Act //Assert` (6.1), и только на непустых этапах.
+4. В конфигах (`application.yaml`, `compose.yaml`, changelog) допустимы короткие пояснения
+   «почему, а не что» — пересказ свойств не пишем.
+5. Разработчик **обязан** удалять комментарии, которые стали неактуальны, вместе с правкой кода:
    устаревший комментарий хуже отсутствующего.
 
-### 6.6. Служебные классы: `@UtilityClass` вместо ручного `final` + пустого конструктора
+Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — три пояснения
+«почему» (плейсхолдеры `spring.ai.openai.*`); в тестах — только `//Arrange //Act //Assert`.
 
-Класс, который существует только ради статических методов (`TestFixtures`, будущие
-`TestData`, хелперы), помечаем Lombok-аннотацией **`@UtilityClass`** (пакет
-`lombok.experimental` — именно `experimental`, `lombok.UtilityClass` не существует).
+### 6.6 Служебные классы: `@UtilityClass`
 
-Что она даёт: класс становится `final`, все поля и методы — статическими, а конструктор
-становится приватным и бросает `UnsupportedOperationException`. Инстанцировать такой класс
-нельзя физически, и это выражает аннотация, а не ручной код.
+Класс, существующий только ради статических методов (`TestFixtures`, будущие `TestData`,
+хелперы), помечаем `@UtilityClass` (пакет `lombok.experimental`; `lombok.UtilityClass`
+не существует). Lombok сам делает класс `final`, члены — статическими, конструктор —
+приватным; инстанцировать такой класс физически нельзя, и это выражает аннотация, а не ручной код.
 
-- [x] Ключевое слово `static` руками **не пишем** — Lombok делает члены статическими сам,
-      а пересказывать аннотацию кодом незачем (тот же принцип, что в 6.5). Проверено `javap`:
-      в байт-коде методы всё равно `public static`.
-- [x] Применено к `src/test/java/.../support/TestFixtures.java` — Lombok подключён и для
-      `default-testCompile` (`maven-compiler-plugin`, `annotationProcessorPaths`),
-      ручные `final class`, `static` и пустой приватный конструктор удалены.
-- Заводить такие классы без `@UtilityClass` нельзя: `@Component`-классы, `@TestConfiguration`
-  и базовые тест-классы (например `PostgresRepositoryTest`, `PostgresTestConfiguration`)
-  аннотацию не получают — им нужен либо Spring, либо наследование.
+- Ключевое слово `static` руками **не пишем** — Lombok делает члены статическими сам
+  (проверено `javap`: в байт-коде они всё равно `public static`).
+- Применено к `support/TestFixtures`; Lombok подключён и для `default-testCompile`
+  (`maven-compiler-plugin`, `annotationProcessorPaths`).
+- `@Component`-классы, `@TestConfiguration` и базовые тест-классы (`PostgresRepositoryTest`,
+  `PostgresTestConfiguration`, `WebTest`) аннотацию не получают: им нужен Spring или
+  наследование.
 
-### 6.7. Внедрение зависимостей: `@RequiredArgsConstructor`, а не ручной конструктор
+### 6.7 Внедрение зависимостей: `@RequiredArgsConstructor`
 
-**Ручной конструктор в стиле «присвоил поля — и всё» — это ровно тот механический код, ради
-которого у нас подключён Lombok.** Класс с `private final`-полями получает
-`@RequiredArgsConstructor`: Lombok сам генерирует конструктор в порядке объявления полей.
-Ручной вариант длиннее, при добавлении зависимости его легко забыть обновить (получится
-`final`-поле без инициализации или поле без присваивания), и он пересказывает то, что
-аннотация уже выражает, — тот же принцип, что в 6.5 и 6.6.
+Класс с `private final`-полями получает `@RequiredArgsConstructor` — Lombok генерирует
+конструктор в порядке объявления полей. Ручной конструктор «присвоил поля — и всё» длиннее, его
+легко забыть обновить при добавлении зависимости, и он пересказывает то, что уже выражает
+аннотация (то же, что 6.5 и 6.6).
 
-- [x] Проверено по всему проекту. Было 2 нарушения, исправлены:
-      `controller/AuthController` (4 зависимости) и `service/UserRegistrationService` (2 зависимости).
-      Теперь во всём коде `private final`-поля есть только у этих двух классов, и оба
-      используют `@RequiredArgsConstructor`.
-      > Lombok подключён и для main, и для test — аннотация доступна везде.
+- Проверено по всему проекту: `private final`-поля есть только у `controller/AuthController`
+  (4 зависимости) и `service/UserRegistrationService` (2 зависимости) — оба на
+  `@RequiredArgsConstructor`. Lombok подключён и для main, и для test.
+- Исключения: JPA-сущности (поля не могут быть `final`, конструктор — часть доменного API),
+  `EmailAlreadyTakenException` (считает строку и зовёт `super(...)`), классы без полей
+  (`HomeController`, `SecurityConfig`), тесты (зависимости внедряются полями `@Autowired`).
+- Проверка перед коммитом: `grep -rn "this\.[a-zA-Z]* = " src/main/java` — если в найденных
+  конструкторах идёт только присваивание `final`-полей, конструктор лишний.
 
-**Когда `@RequiredArgsConstructor` не нужен — исключения:**
+### 6.8 Структура пакетов
 
-| Случай | Почему так |
-|--------|-----------|
-| Сущности JPA (`AppUser`, `ChatMessage`, …) | Поля не могут быть `final` (JPA и `@Setter`), Lombok генерирует конструктор только по `final`-полям. Конструктор здесь — часть доменного API (`new AppUser(email, username, hash)`), а не внедрение зависимостей |
-| `EmailAlreadyTakenException` | Конструктор вычисляет строку и передаёт её в `super(...)` — Lombok такое не умеет |
-| Классы без зависимостей (`HomeController`, `SecurityConfig`) | Полей нет, аннотация была бы пустой |
-| Тесты | Зависимости внедряются полями `@Autowired` — так короче и не нужен конструктор |
-
-**Проверка перед коммитом:** `grep -rn "this\.[a-zA-Z]* = " src/main/java` — если в найденных
-конструкторах идёт только присваивание `final`-полей, значит конструктор лишний.
-
-### 6.8. Структура пакетов: 10 пакетов по роли, без вложенности по фичам
-
-Пакет — это ответ на вопрос «какую роль играет класс», а не «в какой фиче он живёт».
-Фичи у проекта одна (Textik), а ролей ровно десять, поэтому пакеты **плоские**: без
-`featureA/...`, без `byLayer/...`, без вложенности. Вложенность появляется, только когда
-в проекте станет несколько независимых модулей, — на Этапах 2–7 это не наш случай.
+Пакет — это ответ на вопрос «какую роль играет класс», а не «в какой фиче он живёт». Фичи у
+проекта одна, ролей десять, поэтому пакеты плоские: без `byFeature`, без `byLayer`, без
+вложенности. Вложенность появится, только когда появятся независимые модули.
 
 | Пакет | Что в нём лежит | Чего там не бывает |
 |-------|-----------------|-------------------|
-| `entity` | 6 JPA-сущностей: `AppUser`, `Profile`, `LearningSession`, `Question`, `ChatMessage`, `SessionReview` | Spring-сервисов, HTTP, `@Component`-логики |
-| `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления JPA-маппятся `@Enumerated`) |
-| `repository` | 6 Spring Data интерфейсов | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
-| `service` | `UserRegistrationService` (+ будущие сервисы этапов 4–7) | `@GetMapping`/`@PostMapping`, `Model`, `HttpServletRequest` |
-| `dto` | `RegistrationForm` (record формы) + будущие DTO: `TopicProposal`, `GeneratedText`, `TextAnalysisResult` | JPA-аннотаций и связей с БД |
+| `entity` | 6 JPA-сущностей: `AppUser`, `Profile`, `LearningSession`, `Question`, `ChatMessage`, `SessionReview` | Spring-сервисов, HTTP |
+| `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления маппятся `@Enumerated`) |
+| `repository` | 6 интерфейсов Spring Data JPA | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
+| `service` | `UserRegistrationService` (+ будущие сервисы) | HTTP-аннотаций, `Model`, `HttpServletRequest` |
+| `dto` | `RegistrationForm` + будущие records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
 | `exceptions` | `EmailAlreadyTakenException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
-| `controller` | `AuthController`, `HomeController` | Бизнес-логики, `@Entity`, прямой `Repository` |
-| `config` | `SecurityConfig` (все `@Configuration`/`@Bean` приложения) | `@RestController`, `@Service`, сущностей |
+| `controller` | `AuthController`, `HomeController` | Бизнес-логики, `@Entity`, прямого `Repository` |
+| `config` | `SecurityConfig` — все `@Configuration`/`@Bean` приложения | Контроллеров, сервисов, сущностей |
 | `security` | `AppUserDetails` (+ будущее: резолвер текущего пользователя) | `@Configuration` — это уже `config` |
-| `utility` | stateless-хелперы main: `@UtilityClass`, без состояния и без Spring | `@Component`, `@Service`, состояния |
+| `utility` | stateless-хелперы main (`@UtilityClass`), без состояния и без Spring | `@Component`, `@Service`, состояния. **Пока пуст** — задекларированное место для будущих хелперов |
 
-**Направление зависимостей (единственное разрешённое):**
+Направления зависимостей (единственные разрешённые):
 
 ```
-controller ──▶ service ──▶ repository
-     │             │
-     ├──▶ dto      ├──▶ entity ◀── repository
-     └──▶ security/│
-           config  └──▶ exceptions, enums
+controller → service → repository → entity
+     ↓          ↓            ↓
+    dto   exceptions/enums  enums
+  security
 ```
 
-- `controller` знает про `service`, `dto`, `security` (кто вошёл) и `config` (Spring сам);
-  `service` **не знает** про `controller` и `dto` — иначе бизнес-логика привяжется к HTTP;
-- `repository` знает только про `entity` и `enums` — это его единственная работа;
+- `controller` знает `service`, `dto`, `security` (кто вошёл) и `config` (Spring сам);
+  `service` **не знает** про `controller` и `dto` — иначе бизнес-логика привяжется к HTTP.
+- `repository` знает только `entity` и `enums`.
 - `entity` и `enums` не знают ни о ком, кроме `jakarta.persistence` и Lombok: домен не должен
-  зависеть от Spring, иначе его нельзя unit-тестировать без контекста (именно поэтому 16
-  доменных тестов запускаются без Spring);
-- `utility` и `exceptions` — листья: от них никто не зависит, они ни от кого.
-
-**Что изменилось на Этапе 3 (рефакторинг структуры):** пакет `domain` распался на `entity` +
-`enums`; `web` распался на `controller` + `dto`; `EmailAlreadyTakenException` уехал из `service`
-в `exceptions`; `SecurityConfig` уехал из `security` в `config`. Тесты повторяют структуру main:
-`entity/QuestionTests`, `enums/SessionStatusTests`, `controller/LoginTests`,
-`controller/RegistrationTests`, `repository/*RepositoryTests`, `support/*` (тестовая инфраструктура —
-`PostgresTestConfiguration`, базовые классы, `TestFixtures`; это не `utility`, у них нет
-статических методов).
-> Имена тестовых классов при переезде не меняли — структура важнее косметики, а переименование
-> `LoginTests` в `AuthControllerTests` ничего не меняет в покрытии.
-> Пакет `utility` пока пуст: это задекларированное место для будущих хелперов main
-> (`EmailNormalizer`, правила пароля), а не «пакет ради пакета».
-> **После переезда пакетов обязателен `./mvnw clean test`:** в `target/` остаются `.class`
-> старых пакетов, и без `clean` JUnit падает с `NoClassDefFoundError` на старых именах.
+  зависеть от Spring, иначе его нельзя unit-тестировать без контекста (поэтому 16 доменных
+  тестов идут без Spring).
+- `utility` и `exceptions` — листья: не зависят ни от кого, от них не зависят.
+- Тесты повторяют структуру main: `entity/*`, `enums/*`, `controller/*`, `repository/*`;
+  тестовая инфраструктура — в `support` (`PostgresTestConfiguration`, базовые классы,
+  `TestFixtures`), это не `utility`: у базовых классов нет статических методов.
+- **После переезда пакетов — обязателен `./mvnw clean test`:** в `target/` остаются `.class`
+  старых пакетов, и без `clean` JUnit падает с `NoClassDefFoundError` на старых именах.
