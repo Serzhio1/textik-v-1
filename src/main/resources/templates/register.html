@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Регистрация — textik</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body>
+<main class="card">
+	<h1>Регистрация</h1>
+
+	<form th:object="${registrationForm}" th:action="@{/register}" action="/register" method="post" novalidate>
+		<label for="email">Email</label>
+		<input id="email" type="email" th:field="*{email}" name="email" autocomplete="email" autofocus>
+		<p class="error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}">error</p>
+
+		<label for="username">Имя</label>
+		<input id="username" type="text" th:field="*{username}" name="username" autocomplete="name">
+		<p class="error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}">error</p>
+
+		<label for="password">Пароль</label>
+		<input id="password" type="password" th:field="*{password}" name="password" autocomplete="new-password">
+		<p class="error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">error</p>
+
+		<label for="passwordConfirm">Повторите пароль</label>
+		<input id="passwordConfirm" type="password" th:field="*{passwordConfirm}" name="passwordConfirm"
+			   autocomplete="new-password">
+		<p class="error" th:if="${#fields.hasErrors('passwordConfirm')}" th:errors="*{passwordConfirm}">error</p>
+		<p class="error" th:if="${#fields.hasErrors('passwordConfirmed')}" th:errors="*{passwordConfirmed}">error</p>
+
+		<button type="submit">Создать аккаунт</button>
+	</form>
+
+	<p class="hint">Уже есть аккаунт? <a th:href="@{/login}" href="/login">Войти</a></p>
+</main>
+</body>
+</html>

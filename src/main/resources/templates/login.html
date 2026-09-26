@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Вход — textik</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body>
+<main class="card">
+	<h1>Вход</h1>
+
+	<p class="notice error" th:if="${param.error}">Неверный email или пароль</p>
+	<p class="notice ok" th:if="${param.logout}">Вы вышли из аккаунта</p>
+
+	<form th:action="@{/login}" action="/login" method="post" novalidate>
+		<label for="email">Email</label>
+		<input id="email" type="email" name="email" autocomplete="email" autofocus>
+
+		<label for="password">Пароль</label>
+		<input id="password" type="password" name="password" autocomplete="current-password">
+
+		<button type="submit">Войти</button>
+	</form>
+
+	<p class="hint">Нет аккаунта? <a th:href="@{/register}" href="/register">Зарегистрироваться</a></p>
+</main>
+</body>
+</html>

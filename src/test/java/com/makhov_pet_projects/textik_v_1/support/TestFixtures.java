@@ -6,6 +6,7 @@ import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.ProfileRepository;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @UtilityClass
 public class TestFixtures {
@@ -16,6 +17,10 @@ public class TestFixtures {
 
 	public AppUser user(AppUserRepository users) {
 		return users.saveAndFlush(new AppUser(randomEmail(), "Sergey", "bcrypt-hash"));
+	}
+
+	public AppUser userWithPassword(AppUserRepository users, PasswordEncoder passwordEncoder, String rawPassword) {
+		return users.saveAndFlush(new AppUser(randomEmail(), "Sergey", passwordEncoder.encode(rawPassword)));
 	}
 
 	public AppUser userWithProfile(AppUserRepository users, ProfileRepository profiles) {

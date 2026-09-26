@@ -3,19 +3,13 @@ package com.makhov_pet_projects.textik_v_1;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
-import com.makhov_pet_projects.textik_v_1.support.PostgresTestConfiguration;
+import com.makhov_pet_projects.textik_v_1.support.PostgresIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
-@Import(PostgresTestConfiguration.class)
-@ActiveProfiles("test")
 @DisplayName("Контекст приложения")
-class TextikV1ApplicationTests {
+class TextikV1ApplicationTests extends PostgresIntegrationTest {
 
 	@Autowired
 	private AppUserRepository users;

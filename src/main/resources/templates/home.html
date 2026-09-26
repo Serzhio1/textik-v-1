@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>textik</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body>
+<main class="card">
+	<h1>Привет, <span th:text="${displayName}">друг</span>!</h1>
+	<p class="hint">Главный экран сессии появится на Этапе 6, а профиль — на Этапе 4.</p>
+
+	<form th:action="@{/logout}" action="/logout" method="post">
+		<button type="submit" class="secondary">Выйти</button>
+	</form>
+</main>
+</body>
+</html>
