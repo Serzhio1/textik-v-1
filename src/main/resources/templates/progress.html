@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Прогресс')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('progress')}"></nav>
+
+<main class="card card--wide">
+	<h1>Прогресс</h1>
+	<p class="notice ok" th:if="${param.saved}">Профиль сохранён</p>
+
+	<section class="section">
+		<h2 class="section-title">Профиль</h2>
+		<p class="meta">Имя: <span th:text="${displayName}">друг</span></p>
+		<p class="meta">Email: <span th:text="${email}">user@example.com</span></p>
+		<p class="meta">Уровень: <span th:text="${profileForm.level}">A1</span></p>
+		<div class="chips" th:if="${not #lists.isEmpty(interestList)}">
+			<span class="chip" th:each="interest : ${interestList}" th:text="${interest}">интерес</span>
+		</div>
+		<p class="about" th:text="${profileForm.about}">О себе</p>
+	</section>
+
+	<section class="section">
+		<h2 class="section-title">Изменить профиль</h2>
+		<form th:object="${profileForm}" th:action="@{/progress}" action="/progress" method="post" novalidate>
+			<label for="about">О себе</label>
+			<textarea id="about" rows="4" th:field="*{about}" name="about"></textarea>
+			<p class="error" th:if="${#fields.hasErrors('about')}" th:errors="*{about}">error</p>
+
+			<label for="interests">Увлечения</label>
+			<input id="interests" type="text" th:field="*{interests}" name="interests" autocomplete="off">
+			<p class="hint-inline">Через запятую, например: технологии, спорт, музыка</p>
+			<p class="error" th:if="${#fields.hasErrors('interests')}" th:errors="*{interests}">error</p>
+
+			<label>Уровень английского</label>
+			<div class="levels">
+				<label class="level" th:each="level : ${levels}">
+					<input type="radio" th:field="*{level}" th:value="${level}" name="level">
+					<span th:text="${level}">A1</span>
+				</label>
+			</div>
+			<p class="error" th:if="${#fields.hasErrors('level')}" th:errors="*{level}">error</p>
+
+			<button type="submit">Сохранить</button>
+		</form>
+	</section>
+
+	<section class="section">
+		<h2 class="section-title">История сессий</h2>
+		<p class="meta">Пройдено сессий: <span th:text="${sessionCount}">0</span></p>
+		<div class="empty" th:if="${#lists.isEmpty(history)}">Здесь появятся ваши сессии</div>
+		<ul class="history" th:if="${not #lists.isEmpty(history)}">
+			<li class="history__item" th:each="past : ${history}">
+				<span th:text="${past.title}">Тема</span>
+				<span class="chip" th:text="${past.status}">PROPOSED</span>
+			</li>
+		</ul>
+	</section>
+</main>
+</body>
+</html>

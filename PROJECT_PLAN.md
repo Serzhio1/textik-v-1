@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 54 теста, ~30 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 66 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ```
 
@@ -68,6 +68,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 12 | Структура пакетов | **10 плоских пакетов по роли** | `entity`, `enums`, `repository`, `service`, `dto`, `exceptions`, `controller`, `config`, `security`, `utility`. Пакет отвечает на вопрос «какую роль играет класс», а не «в какой фиче он живёт»; вложенность (`byFeature`, `byLayer`) — когда появятся независимые модули. Таблица и направления зависимостей — 6.8 |
 | 13 | Имя сущности сессии | **`LearningSession`** (таблица `sessions`) | Чтобы не конфликтовать с `HttpSession` и `org.hibernate.Session` |
 | 14 | Восстановление пароля | **Вне скоупа** | Регистрация + вход + выход |
+| 15 | Обязательность онбординга | **`HandlerInterceptor`** | Пока у пользователя нет `Profile`, любой защищённый маршрут (кроме `/onboarding`, `/logout`, `/login`, `/register`, `/error`, `/css/**`) отвечает 302 на `/onboarding`. Реализация — `OnboardingInterceptor` + `WebConfig`; `SecurityConfig` не менялся, `/onboarding` и `/progress` уже под `anyRequest().authenticated()` |
+| 16 | Редактирование профиля | **Только `about`, `interests`, `level`** | Имя и email задаются при регистрации и на странице прогресса только показываются |
+| 17 | Ввод интересов | **Одно поле через запятую, показ — «чипсами»** | Без JS-редактора тегов: `Interests.split()` режет строку для показа, `Interests.normalize()` чистит и склеивает перед сохранением (`" технологии , спорт ,,"` → `"технологии, спорт"`) |
 
 ### Следствия для архитектуры
 
@@ -137,7 +140,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 | `dto/RegistrationForm` | record: email, имя, пароль 8..72 символов + подтверждение (верхняя граница — лимит BCrypt в 72 байта) |
 | `controller/AuthController` | `GET /register`, `POST /register`, `GET /login`; внедрение зависимостей — Lombok `@RequiredArgsConstructor` |
 | `controller/HomeController` | `GET /` — временный главный экран («Привет, <имя>!»), на Этапе 6 дорастёт |
-| `resources/templates` | `register.html`, `login.html`, `home.html` + `static/css/app.css` |
+| `resources/templates` | `fragments.html`, `onboarding.html`, `progress.html`, `register.html`, `login.html`, `home.html` + `static/css/app.css` |
 
 Поведение: **email = логин** (`.usernameParameter("email")`, 5.1); после регистрации —
 сразу главный экран, без второго ввода (контекст ставит контроллер, id сессии меняет
@@ -145,30 +148,64 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 остальное за авторизацией; CSRF включён; ролей не заводили — у всех `ROLE_USER`. Все сообщения
 валидации и ошибок — русские.
 
-### 3.4 Тесты — 54, `./mvnw test` зелёные (~30 с)
+### 3.4 Профиль, онбординг, прогресс (Этап 4, выполнен)
+
+| Слой | Классы |
+|------|--------|
+| `dto` | `ProfileForm` — record с `about` (≤ 2000), `interests` (≤ 500), `level` (`@Pattern` `A1\|A2\|B1`), фабрика `empty()`, список `LEVELS` |
+| `service` | `ProfileService` (`exists`, `find`, `create`, `update`), `SessionService` (`findHistory`) |
+| `utility` | `Interests` — `split()` для показа, `normalize()` для записи |
+| `security` | `OnboardingInterceptor` — 302 на `/onboarding`, пока профиля нет |
+| `config` | `WebConfig` — регистрирует интерсептор и список исключений |
+| `controller` | `OnboardingController` (`/onboarding`), `ProfileController` (`/progress`) |
+| Шаблоны | `fragments.html` (`head(title)`, `nav(active)`), `onboarding.html`, `progress.html`, обновлены `home.html`, `login.html`, `register.html` |
+
+Поведение:
+
+- **Онбординг обязателен.** Пользователь без `Profile` на любом защищённом маршруте получает
+  302 на `/onboarding` (15). `/onboarding` для пользователя с профилем — 302 на `/progress`,
+  чтобы нельзя было затереть профиль повторно. Уровень выбирается «карточками»-радио
+  (`A1`/`A2`/`B1`), интересы — одним полем через запятую; при сохранении 302 на `/`.
+- **Профиль.** `/progress` показывает имя, email, уровень, «чипсы» интересов и текст «О себе»;
+  ниже форма редактирования тех же трёх полей. Имя и email только показываются (16). Успех →
+  302 на `/progress?saved` + зелёное уведомление «Профиль сохранён». Ошибка валидации →
+  форма с русскими сообщениями, в базе старое значение.
+- **Прогресс.** Секция «История сессий»: счётчик `sessionCount` и список тем со статусом;
+  пока данных нет — пустое состояние «Здесь появятся ваши сессии». Сессии отдаёт
+  `SessionRepository.findByUserIdOrderByIdDesc(userId)`, поле `profile` в БД не заводим.
+- Интерфейс — русский, стили в `static/css/app.css`: навигация с активным пунктом, карточки
+  уровней, «чипсы», пустое состояние.
+
+### 3.5 Тесты — 66, `./mvnw test` зелёные (~40 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4 | 10 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 5 | 22 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
 - Базовые классы в `support/`: `PostgresRepositoryTest` (`@DataJpaTest`), `PostgresIntegrationTest`
   (`@SpringBootTest` + контейнер + профиль `test`), `WebTest` (`+ @AutoConfigureMockMvc`),
-  `PostgresTestConfiguration` (контейнер как Spring-бин), `TestFixtures` (фабрики данных).
+  `PostgresTestConfiguration` (контейнер как Spring-бин), `TestFixtures` (фабрики данных:
+  `user`, `userWithPassword`, `userWithProfile`, `session`).
 - Требования к тестам — 6.1–6.4.
+- MockMvc-тесты авторизуются через `user(AppUserDetails.of(user))`: с `user(...)` из
+  `spring-security-test` в контексте лежит чужой principal, и интерсептор профиль не увидит.
 
-### 3.5 Проверено на живом приложении
+### 3.6 Проверено на живом приложении
 
-`spring-boot:run` + `curl` с cookie-jar: аноним → 302 на `/login`; регистрация → 302 на `/`
-и «Привет, Sergey!»; повторный email и несовпадение паролей → форма с русской ошибкой;
-неверный пароль → `/login?error`; выход → `/login?logout`, после него `/` снова 302 на `/login`.
+`spring-boot:run` + `curl` с cookie-jar: аноним → 302 на `/login`; регистрация → 302 на `/`,
+затем `/` → 302 на `/onboarding`; онбординг отдаёт форму и принимает
+`" технологии , спорт ,, "` → в базе `технологии, спорт`; главная доступна (200);
+`/progress` показывает email, уровень и чипсы; `level=C2` → форма с ошибкой
+«Выберите уровень A1, A2 или B1»; успешное сохранение → 302 на `/progress?saved` и «Профиль
+сохранён»; выход → `/login?logout`, после него `/` снова 302 на `/login`. Строка в БД:
+`about=Теперь читаю книги`, `interests=книги, музыка`, `level=B1`.
 CSRF-токен после входа перевыпускается (5.1).
 
-### 3.6 Чего ещё нет
+### 3.7 Чего ещё нет
 
-- Онбординг, профиль, прогресс (Этап 4).
 - Слой ИИ: `AiGateway`, DTO structured output, промпты, stub для профиля `local` (Этап 5).
 - Главный экран с плашками этапов, выбор темы, чтение (Этап 6); вопросы (7), обсуждение (8),
   ревью (9).
@@ -192,14 +229,16 @@ CSRF-токен после входа перевыпускается (5.1).
 - [x] Form login, BCrypt, регистрация с автологином, выход, 10 тестов MockMvc + ручная
       проверка живого приложения (3.3, 3.4).
 
-### Этап 4. Онбординг + профиль + прогресс (каркас)
-- [ ] Онбординг: «О себе», интересы (через запятую), уровень (A1/A2/B1). Имя задаётся при
+### Этап 4. Онбординг + профиль + прогресс (каркас) — выполнен
+- [x] Онбординг: «О себе», интересы (через запятую), уровень (A1/A2/B1). Имя задаётся при
       регистрации (`username`) и показывается в профиле. После входа без профиля → редирект
-      на онбординг.
-- [ ] Профиль: просмотр + редактирование всех полей. Учесть: `Profile` грузится по `userId`
-      из репозитория, навигации `user.getProfile()` нет (5.1).
-- [ ] Прогресс: профиль + история сессий (пока пустой список; данные появятся на Этапе 9).
-- [ ] Проверка: онбординг обязателен, редактирование сохраняется.
+      на онбординг (`OnboardingInterceptor`, 15).
+- [x] Профиль: просмотр + редактирование `about`, `interests`, `level`; имя и email только
+      показываются (16). `Profile` грузится по `userId` через `ProfileService` (5.1).
+- [x] Прогресс: профиль + история сессий (`SessionService.findHistory`, пустое состояние;
+      данные появятся на Этапах 6–9).
+- [x] Общие фрагменты `head`/`nav` — дублирования разметки больше нет.
+- [x] Проверка: 12 новых тестов MockMvc + ручная проверка живого приложения (3.4–3.6).
 
 ### Этап 5. Слой ИИ (AiGateway)
 - [ ] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
@@ -224,7 +263,7 @@ CSRF-токен после входа перевыпускается (5.1).
       обновление страницы перегенерирует их (осознанный MVP-трейдофф, 5.1).
 - [ ] Выбор темы → генерация полного текста → `read.html` (название, описание, текст,
       «К вопросам»).
-- [ ] Пересмотреть layout-фрагмент (5) — экранов станет 8+.
+- [x] Экраны подключают `head`/`nav` из `fragments.html` (Этап 4), вопрос про layout закрыт (5).
 - [ ] Проверка: «Начать сессию» → 3 темы → читаем текст.
 
 ### Этап 7. Вопросы (Think)
@@ -266,9 +305,10 @@ CSRF-токен после входа перевыпускается (5.1).
       OpenAI-совместимый `base-url` и имя `model` (блокирует Этап 5).
 - [ ] Прогресс между сессиями пользователя (статистика по времени, «выучено слов» и т.п.) —
       вне скоупа MVP, кандидаты на следующую итерацию.
-- [ ] Шаблон-обёртка (layout-фрагмент) пока не заводили: на трёх страницах дублируется `<head>`,
-      но фрагмент, принимающий кусок разметки параметром, читается неочевидно. Пересмотреть на
-      Этапе 6, когда экранов станет 8+.
+
+> Вопрос про layout-шаблон закрыт на Этапе 4: `fragments.html` с фрагментами `head(title)` и
+> `nav(active)` — дублирования `<head>` больше нет, и на Этапах 5–9 новые страницы подключают
+> фрагменты одной строкой `th:replace`.
 
 ### 5.1 Принятые технические решения (не пересматривать)
 
@@ -315,6 +355,17 @@ CSRF-токен после входа перевыпускается (5.1).
   (`Long userId`), профиль берётся из `profileRepository.findById(currentUserId)`, каскада нет
   (удаление профиля делает `ON DELETE CASCADE` в БД). Понадобится `user.getProfile()` — changeset
   007 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
+- **Проверка «профиль заполнен» живёт в MVC-слое, а не в `SecurityConfig`:** `HandlerInterceptor`
+  вызывается после фильтров, поэтому анонимного пользователя до него не доходит, а
+  `Authentication` уже в `SecurityContext` — principal доступен без запроса к БД. Проверка
+  `profiles.exists(id)` дешёвая (PK), но выполняется на каждый защищённый запрос; если понадобится
+  оптимизация — кеш в сессии.
+- **В Thymeleaf имя переменной `session` зарезервировано** (`${session}` — web variables map):
+  цикл по истории сессий назван `past`.
+- **`th:field` и `BindingResult` не переживают подмену model-атрибута:** на пустой
+  `ProfileForm` в модели остаётся объект формы из `@ModelAttribute` с его ошибками. Поэтому при
+  ошибке валидации `ProfileController` докладывает только остальные атрибуты страницы
+  (`addCommonAttributes`), а `profileForm` не перезаписывает.
 
 ---
 
@@ -437,30 +488,33 @@ CSRF-токен после входа перевыпускается (5.1).
 | `entity` | 6 JPA-сущностей: `AppUser`, `Profile`, `LearningSession`, `Question`, `ChatMessage`, `SessionReview` | Spring-сервисов, HTTP |
 | `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления маппятся `@Enumerated`) |
 | `repository` | 6 интерфейсов Spring Data JPA | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
-| `service` | `UserRegistrationService` (+ будущие сервисы) | HTTP-аннотаций, `Model`, `HttpServletRequest` |
-| `dto` | `RegistrationForm` + будущие records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
+| `service` | `UserRegistrationService`, `ProfileService`, `SessionService` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
+| `dto` | `RegistrationForm`, `ProfileForm` + будущие records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
 | `exceptions` | `EmailAlreadyTakenException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
-| `controller` | `AuthController`, `HomeController` | Бизнес-логики, `@Entity`, прямого `Repository` |
-| `config` | `SecurityConfig` — все `@Configuration`/`@Bean` приложения | Контроллеров, сервисов, сущностей |
-| `security` | `AppUserDetails` (+ будущее: резолвер текущего пользователя) | `@Configuration` — это уже `config` |
-| `utility` | stateless-хелперы main (`@UtilityClass`), без состояния и без Spring | `@Component`, `@Service`, состояния. **Пока пуст** — задекларированное место для будущих хелперов |
+| `controller` | `AuthController`, `HomeController`, `OnboardingController`, `ProfileController` | Бизнес-логики, `@Entity`, прямого `Repository` |
+| `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`) | Контроллеров, сервисов, сущностей |
+| `security` | `AppUserDetails`, `OnboardingInterceptor` | `@Configuration` — это уже `config` |
+| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests` | `@Component`, `@Service`, состояния |
 
 Направления зависимостей (единственные разрешённые):
 
 ```
 controller → service → repository → entity
-     ↓          ↓            ↓
-    dto   exceptions/enums  enums
-  security
+      ↓          ↓            ↓
+     dto   exceptions/enums  enums
+  security/config
 ```
 
 - `controller` знает `service`, `dto`, `security` (кто вошёл) и `config` (Spring сам);
   `service` **не знает** про `controller` и `dto` — иначе бизнес-логика привяжется к HTTP.
+- `security` знает `service` и `entity`: `OnboardingInterceptor` спрашивает `ProfileService`,
+  есть ли профиль. Исключение из «`security` — лист», обоснованное в 5.1.
 - `repository` знает только `entity` и `enums`.
 - `entity` и `enums` не знают ни о ком, кроме `jakarta.persistence` и Lombok: домен не должен
   зависеть от Spring, иначе его нельзя unit-тестировать без контекста (поэтому 16 доменных
   тестов идут без Spring).
 - `utility` и `exceptions` — листья: не зависят ни от кого, от них не зависят.
+  `Interests` — тоже лист: `ProfileService` вызывает его статически, внедрять нечего.
 - Тесты повторяют структуру main: `entity/*`, `enums/*`, `controller/*`, `repository/*`;
   тестовая инфраструктура — в `support` (`PostgresTestConfiguration`, базовые классы,
   `TestFixtures`), это не `utility`: у базовых классов нет статических методов.

@@ -1,9 +1,11 @@
 package com.makhov_pet_projects.textik_v_1.support;
 
 import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
 import com.makhov_pet_projects.textik_v_1.entity.Profile;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.ProfileRepository;
+import com.makhov_pet_projects.textik_v_1.repository.SessionRepository;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +29,12 @@ public class TestFixtures {
 		AppUser user = user(users);
 		profiles.saveAndFlush(Profile.of(user.getId(), "Люблю IT и спорт", "technology, sport", "B1"));
 		return user;
+	}
+
+	public LearningSession session(SessionRepository sessions, AppUser user, String title) {
+		LearningSession session = LearningSession.proposed(user, "A1");
+		session.setTitle(title);
+		return sessions.saveAndFlush(session);
 	}
 
 }

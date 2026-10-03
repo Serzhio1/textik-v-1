@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Онбординг')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('onboarding')}"></nav>
+
+<main class="card">
+	<h1>Давайте познакомимся</h1>
+	<p class="hint-inline hint-inline--top">Это нужно, чтобы подбирать темы, тексты и вопросы под вас</p>
+
+	<form th:object="${profileForm}" th:action="@{/onboarding}" action="/onboarding" method="post" novalidate>
+		<label for="about">О себе</label>
+		<textarea id="about" rows="4" th:field="*{about}" name="about"
+				  placeholder="Например: работаю в IT, учу английский по вечерам, хочу читать статьи без словаря"></textarea>
+		<p class="error" th:if="${#fields.hasErrors('about')}" th:errors="*{about}">error</p>
+
+		<label for="interests">Увлечения</label>
+		<input id="interests" type="text" th:field="*{interests}" name="interests" autocomplete="off">
+		<p class="hint-inline">Через запятую, например: технологии, спорт, музыка</p>
+		<p class="error" th:if="${#fields.hasErrors('interests')}" th:errors="*{interests}">error</p>
+
+		<label>Уровень английского</label>
+		<div class="levels">
+			<label class="level" th:each="level : ${levels}">
+				<input type="radio" th:field="*{level}" th:value="${level}" name="level">
+				<span th:text="${level}">A1</span>
+			</label>
+		</div>
+		<p class="error" th:if="${#fields.hasErrors('level')}" th:errors="*{level}">error</p>
+
+		<button type="submit">Сохранить и продолжить</button>
+	</form>
+</main>
+</body>
+</html>

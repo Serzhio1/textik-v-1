@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${title} + ' — textik'">textik</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+</head>
+<body>
+<nav th:fragment="nav(active)" class="nav">
+	<div class="nav__inner">
+		<a class="nav__brand" th:href="@{/}" href="/">textik</a>
+		<a class="nav__link" th:href="@{/}" href="/" th:classappend="${active == 'home'} ? 'nav__link--active'">Главная</a>
+		<a class="nav__link" th:href="@{/progress}" href="/progress"
+		   th:classappend="${active == 'progress'} ? 'nav__link--active'">Прогресс</a>
+		<span class="nav__user" th:text="${#authentication.principal.displayName}">пользователь</span>
+		<form th:action="@{/logout}" action="/logout" method="post" class="nav__logout">
+			<button type="submit" class="link-button">Выйти</button>
+		</form>
+	</div>
+</nav>
+</body>
+</html>
