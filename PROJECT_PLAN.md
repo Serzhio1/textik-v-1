@@ -10,17 +10,19 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 66 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 86 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
 
 - **Стек:** Java 21, Spring Boot **4.1.1**, Spring Security 7, Spring Data JPA, Thymeleaf,
-  Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент под Яндекс), Postgres 17, Lombok.
+  Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент), Postgres 17, Lombok.
 - **Структура кода:** 10 плоских пакетов, таблица и направления зависимостей — **6.8**.
-- **Сделано:** Этапы 0–3 (инфраструктура, домен, аутентификация) — **3**.
-- **Следующий этап:** 4 — онбординг, профиль, прогресс — **4**.
+- **Сделано:** Этапы 0–5 (инфраструктура, домен, аутентификация, онбординг, слой ИИ) — **3.5**.
+- **Следующий этап:** 6 — главный экран, выбор темы, чтение — **4**.
 - **Правила и запреты:** 6 (комментарии, Lombok, тесты) и 5.1 (не трогать changeset-файлы,
   не заводить `src/test/resources/application.yaml`).
+- **Ключ ИИ не нужен для разработки:** профиль `local` подставляет заглушку (5.1).
 
 ---
 
@@ -60,7 +62,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt. **Email = логин**; в `users` хранится `username` — имя (Sergey и т.п.), видно в профиле и в диалоге с ИИ |
 | 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, один артефакт |
 | 6 | Способ интеграции с LLM | **Spring AI** | Structured Output: модель отдаёт JSON → record в `dto` |
-| 7 | LLM-провайдер | **Яндекс (YandexGPT)** | Официального Spring AI-провайдера Яндекса нет; у Яндекса есть OpenAI-совместимый endpoint → `spring-ai-starter-model-openai` с `base-url` / `api-key` / `model`. Конкретная модель не выбрана (5) |
+| 7 | LLM-провайдер | **Любой OpenAI-совместимый endpoint** | Официального Spring AI-провайдера Яндекса нет, но `spring-ai-starter-model-openai` работает с любым OpenAI-совместимом API. Провайдер, модель и ключ задаются **только переменными окружения** (`AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`) — смена провайдера не требует правок кода. Модель по умолчанию не выбрана, ключа нет (5) |
 | 8 | Уровень пользователя (A1–B1) | **Ручной выбор в онбординге** | В исходном ТЗ поля нет, но тексты обязаны подбираться по уровню |
 | 9 | Аватар | **Без загрузки файлов** | В MVP — инициалы из `username`. Загрузка файлов вне скоупа |
 | 10 | Тип вопросов (Think) | **Только single-choice** | Один правильный из 4 вариантов, проверка детерминированная (сравнение с `correct_answer`). `q_type` и оценка открытых ответов убраны из MVP |
@@ -74,10 +76,10 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 
 ### Следствия для архитектуры
 
-- Вся работа с ИИ изолируется за интерфейсом **`AiGateway`** (Этап 5) — смена провайдера
-  или endpoint не ломает остальное приложение.
-- Для офлайн-разработки и тестов будет spring-profile **`local`** со stub-реализацией
-  `AiGateway` (предзаполненный контент без API-ключа) — Этап 5.
+- Вся работа с ИИ изолируется за интерфейсом **`AiGateway`** (Этап 5, сделан) — смена провайдера,
+  модели или endpoint не ломает остальное приложение.
+- Для офлайн-разработки и тестов есть spring-profile **`local`** со заглушкой
+  `AiGateway` (предзаполненный контент без API-ключа) и опция резервной модели (Этап 5, 3.5).
 - `LearningSession` — центральная сущность: статус продвижения
   `PROPOSED → READ → THINK → DISCUSS → DONE`, тема, текст, вопросы, переписка, результат.
 - Все данные привязаны к пользователю; на маршрутах `/sessions/{id}/...` — проверка
@@ -100,7 +102,8 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - `compose.yaml`: Postgres 17, БД/пользователь/пароль `textik`, том, healthcheck, порт **5433**.
 - `application.yaml`: datasource (env с дефолтами), `ddl-auto: validate`, `open-in-view: false`,
   Liquibase на `classpath:db/changelog/db.changelog-master.yaml`, плейсхолдеры
-  `spring.ai.openai.*` (заполняются на Этапе 5). Три комментария в файле — только «почему».
+  `spring.ai.openai.*` с **обезличенными** именами переменных (`AI_API_KEY`, `AI_BASE_URL`,
+  `AI_MODEL`, `AI_TEMPERATURE`) и `app.ai.fallback`. Комментарии в файле — только «почему».
 - `db/changelog/db.changelog-master.yaml` подключает `changesets/001-create-users`,
   `002-create-profiles`, `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
   `006-create-session-reviews`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
@@ -176,24 +179,62 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - Интерфейс — русский, стили в `static/css/app.css`: навигация с активным пунктом, карточки
   уровней, «чипсы», пустое состояние.
 
-### 3.5 Тесты — 66, `./mvnw test` зелёные (~40 с)
+### 3.5 Слой ИИ (Этап 5, выполнен)
+
+| Слой | Классы | Роль |
+|------|--------|------|
+| `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `continueDiscussion`, `generateReview` |
+| `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
+| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~400 слов, 5 вопросов, реплики по ходу разговора, итоги |
+| `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
+| `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | Records structured output |
+| `exceptions` | `AiGatewayException` | Единая ошибка слоя ИИ (endpoint, пустой ответ, неразбираемый JSON) |
+| `utility` | `AiPrompts` | 5 промптов (темы, текст, вопросы, обсуждение, ревью) как `@UtilityClass`-константы |
+| `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
+
+Поведение:
+
+- **Смена провайдера — только конфиг.** Три переменные окружения: `AI_BASE_URL`, `AI_MODEL`,
+  `AI_API_KEY` (+ необязательный `AI_TEMPERATURE`). Работает любой OpenAI-совместимый endpoint
+  (Яндекс, OpenAI, Groq, Ollama). Код при смене провайдера не меняется.
+- **Офлайн без ключа.** Профиль `local` (`--spring.profiles.active=local`) подставляет
+  `StubAiGateway`: весь цикл Read→Think→Discuss→Review проходит без сети.
+- **Страховка.** `AI_FALLBACK=stub` оборачивает боевую модель в `FallbackAiGateway`: при сбое
+  основной (таймаут, пустой ответ, неразбираемый JSON) ученик получает заготовленный контент,
+  а в лог уходит предупреждение. Упали обе — выбрасывается `AiGatewayException`, у которого
+  резервная ошибка в `suppressed`.
+- **Structured Output без `response_format`.** JSON-схему добавляет `BeanOutputConverter.getFormat()`
+  в текст промпта, поэтому не требуется поддержка `json_schema` на стороне провайдера — иначе
+  часть OpenAI-совместимых API не заработала бы. Ответ в ```json```-блоке тоже разбирается.
+- `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
+  вызывающий код обязан быть `@Transactional` (см. 5.1).
+
+### 3.6 Тесты — 86, `./mvnw test` зелёные (~35 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
+| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3 | 18 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
 | Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 5 | 22 |
+| Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1 | 2 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
 - Базовые классы в `support/`: `PostgresRepositoryTest` (`@DataJpaTest`), `PostgresIntegrationTest`
   (`@SpringBootTest` + контейнер + профиль `test`), `WebTest` (`+ @AutoConfigureMockMvc`),
   `PostgresTestConfiguration` (контейнер как Spring-бин), `TestFixtures` (фабрики данных:
-  `user`, `userWithPassword`, `userWithProfile`, `session`).
+  `user`, `userWithPassword`, `userWithProfile`, `session`), `FakeChatModel` (`@UtilityClass`:
+  `answeringWith`, `recording`, `failing`).
 - Требования к тестам — 6.1–6.4.
 - MockMvc-тесты авторизуются через `user(AppUserDetails.of(user))`: с `user(...)` из
   `spring-security-test` в контексте лежит чужой principal, и интерсептор профиль не увидит.
+- Слой ИИ в тестах **не ходит в сеть**: `SpringAiGateway` собирается с
+  `ChatClient.builder(FakeChatModel...)` — так проверяются и промпт, и разбор JSON без Spring-контекста;
+  `FallbackAiGateway` проверяется на Mockito-заглушках `AiGateway`.
+- `LocalAiGatewayWiringTests` поднимает контекст с профилями `test` + `local` и убеждается, что
+  бин `AiGateway` — заглушка: офлайн-режим не может отвалиться молча.
 
-### 3.6 Проверено на живом приложении
+### 3.7 Проверено на живом приложении
 
 `spring-boot:run` + `curl` с cookie-jar: аноним → 302 на `/login`; регистрация → 302 на `/`,
 затем `/` → 302 на `/onboarding`; онбординг отдаёт форму и принимает
@@ -204,11 +245,16 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 `about=Теперь читаю книги`, `interests=книги, музыка`, `level=B1`.
 CSRF-токен после входа перевыпускается (5.1).
 
-### 3.7 Чего ещё нет
+Слой ИИ на живом приложении **не проверялся**: ключа и выбранной модели нет (5, раздел 5).
+Проверено автоматическими тестами: разбор JSON, отказоустойчивость, оба режима wiring (3.6).
+Живой вызов с настоящим ключом — первая задача Этапа 10 (README с переменными окружения).
 
-- Слой ИИ: `AiGateway`, DTO structured output, промпты, stub для профиля `local` (Этап 5).
+### 3.8 Чего ещё нет
+
 - Главный экран с плашками этапов, выбор темы, чтение (Этап 6); вопросы (7), обсуждение (8),
-  ревью (9).
+  ревью (9). Слой ИИ к ним готов, но ещё не вызывается из приложения.
+- Сервис сессий, который сохраняет сгенерированный контент в БД и двигает статусы
+  `PROPOSED → READ → THINK → DISCUSS → DONE` (Этапы 6–9).
 - Восстановление пароля, аватар с загрузкой, статистика между сессиями — вне скоупа MVP.
 
 ---
@@ -238,23 +284,24 @@ CSRF-токен после входа перевыпускается (5.1).
 - [x] Прогресс: профиль + история сессий (`SessionService.findHistory`, пустое состояние;
       данные появятся на Этапах 6–9).
 - [x] Общие фрагменты `head`/`nav` — дублирования разметки больше нет.
-- [x] Проверка: 12 новых тестов MockMvc + ручная проверка живого приложения (3.4–3.6).
+- [x] Проверка: 12 новых тестов MockMvc + ручная проверка живого приложения (3.4, 3.6, 3.7).
 
-### Этап 5. Слой ИИ (AiGateway)
-- [ ] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
+### Этап 5. Слой ИИ (AiGateway) — выполнен
+- [x] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
       `GeneratedText`, `GeneratedQuestion`, `ReviewData`.
-- [ ] Методы: `generateProposals`, `generateText`, `generateQuestions`, `continueDiscussion`,
+- [x] Методы: `generateTopics`, `generateText`, `generateQuestions`, `continueDiscussion`,
       `generateReview`.
-- [ ] Реализация через Spring AI `ChatClient` (OpenAI-стартер → endpoint Яндекса),
-      Structured Output.
-- [ ] Промпты:
+- [x] Реализация через Spring AI `ChatClient` (OpenAI-стартер, любой совместимый endpoint),
+      Structured Output через `BeanOutputConverter`.
+- [x] Промпты (`utility/AiPrompts`):
       1. 3 идеи тем по интересам/уровню → экран выбора;
       2. полный текст 350–500 слов под уровень;
       3. 5–10 вопросов (один правильный из 4 вариантов) с правильными ответами и объяснениями;
-      4. обсуждение — системный промпт «держимся темы, возвращаем ушедшего», лимит 3–5 обменов;
+      4. обсуждение — «держимся темы, возвращаем ушедшего» (лимит 3–5 обменов считает Этап 8);
       5. ревью — резюме, частые ошибки, оценка уровня разговора.
-- [ ] **Stub-реализация** (`@Profile("local")`) без API-ключа.
-- [ ] Проверка: с `local` — полный цикл офлайн; с настоящим ключом Яндекса — живой вызов.
+- [x] **Заглушка** для профиля `local` без API-ключа + `FallbackAiGateway` как резервная модель.
+- [x] Проверка: 18 тестов слоя ИИ + 2 теста wiring, сеть не используется; полный цикл офлайн
+      проверяется на Этапах 6–9. Живой вызов с настоящим ключом — Этап 10.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
 - [ ] Home: название приложения, 4 плашки этапов с временем + «Начать сессию».
@@ -294,24 +341,54 @@ CSRF-токен после входа перевыпускается (5.1).
       дублирующей генерации.
 - [ ] Загрузочные состояния, валидация форм.
 - [ ] Тесты: проверка ответа, проверка владельца, генерация через stub.
-- [ ] README: как получить ключ Яндекса, какие поля конфига заполнить.
+- [ ] README: как получить API-ключ (Яндекс/OpenAI/другой провайдер), какие поля конфига
+      заполнить: `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, необязательный `AI_FALLBACK`;
+      живой вызов всех пяти методов `AiGateway`.
 - [ ] `./mvnw test` зелёный, полный пользовательский сценарий без падений.
 
 ---
 
 ## 5. Открытые вопросы
 
-- [ ] Выбрать конкретную модель Яндекса и получить API-ключ в Yandex Cloud; подтвердить точный
-      OpenAI-совместимый `base-url` и имя `model` (блокирует Этап 5).
+- [ ] Получить API-ключ любого OpenAI-совместимого провайдера и выбрать модель; прописать
+      `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`. **Этап 5 кодом не блокирован** — слой готов и
+      работает офлайн на заглушке; блокирует только живой вызов (Этап 10, README).
 - [ ] Прогресс между сессиями пользователя (статистика по времени, «выучено слов» и т.п.) —
       вне скоупа MVP, кандидаты на следующую итерацию.
 
 > Вопрос про layout-шаблон закрыт на Этапе 4: `fragments.html` с фрагментами `head(title)` и
-> `nav(active)` — дублирования `<head>` больше нет, и на Этапах 5–9 новые страницы подключают
+> `nav(active)` — дублирования `<head>` больше нет, и на Этапах 6–9 новые страницы подключают
 > фрагменты одной строкой `th:replace`.
 
 ### 5.1 Принятые технические решения (не пересматривать)
 
+- **Провайдер ИИ не зашит в код.** Только `spring.ai.openai.*` с переменными окружения
+  `AI_BASE_URL` / `AI_MODEL` / `AI_API_KEY`: подходит любой OpenAI-совместимый endpoint
+  (Яндекс, OpenAI, Groq, Ollama). Добавить второго провайдера — новый класс, реализующий
+  `AiGateway`; переключить — одна переменная. Резервная модель включается `AI_FALLBACK=stub`
+  (`FallbackAiGateway`): при `AiGatewayException` основной модели отвечает заглушка.
+- **Structured Output делаем через `BeanOutputConverter`, а не через `response_format`:** схема
+  JSON-схемой добавляется в текст промпта (`getFormat()`), поэтому не требуется поддержка
+  `json_schema` на стороне провайдера — иначе часть OpenAI-совместимых API не заработала бы.
+  Списки (`List<TopicProposal>`, `List<GeneratedQuestion>`) идут «голым» JSON-массивом,
+  ответ в блоке ```json``` тоже разбирается. Нативный structured output Spring AI 2 — кандидат
+  на следующую итерацию, если у выбранного провайдера он гарантированно работает.
+- **`AiGateway` лежит в плоском пакете `service`**, без вложенности `service/ai` (6.8): фича
+  одна, роль одна. Из этого следует документированное исключение из правила «`service` не знает
+  про `dto`» — шлюз обменивается records-ами `dto`. Обратной зависимости нет: `dto` не знает
+  про `service`.
+- **`continueDiscussion` и `generateReview` принимают `LearningSession`** и читают её
+  `chatMessages` и `questions` (LAZY, при `open-in-view: false`). Вызывающий код обязан быть
+  `@Transactional`, иначе `LazyInitializationException`. Если понадобится вызывать вне
+  транзакции — переходить на `fetch = EAGER` или на отдельные запросы.
+- **`ReviewData` не содержит числа вопросов:** их считает код по `Question.isCorrect()`,
+  поручать счёт модели нельзя. В `session_reviews` они и так есть (`SessionReview.of`).
+- **Замена `Profile` (сущность) на `@Profile` (аннотация) в одном файле невозможна** — Java
+  не различает импорт по имени. Поэтому профиль подставляется на бинах в `config`
+  (`AiGatewayConfig`), а не аннотацией на классе реализации. Побочный эффект, который стоит
+  знать: **любая ошибка компиляции в одном классе «ломает» Lombok во всём модуле** — annotation
+  processing не доходит до конца, и в ошибках появляются фантомные «cannot find symbol: getRole()»
+  на сгенерированных Lombok-методах. Настоящая первая ошибка — в начале списка.
 - **Changeset-файлы 001–006 не трогаем** — иначе сломается checksum. Новые изменения — новыми
   файлами (нумерация с 007).
 - **`src/test/resources/application.yaml` заводить нельзя** — одноимённый файл затеняет
@@ -443,8 +520,9 @@ CSRF-токен после входа перевыпускается (5.1).
 5. Разработчик **обязан** удалять комментарии, которые стали неактуальны, вместе с правкой кода:
    устаревший комментарий хуже отсутствующего.
 
-Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — три пояснения
-«почему» (плейсхолдеры `spring.ai.openai.*`); в тестах — только `//Arrange //Act //Assert`.
+Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — четыре пояснения
+«почему» (плейсхолдеры `spring.ai.openai.*` и `app.ai.fallback`); в тестах — только
+`//Arrange //Act //Assert`.
 
 ### 6.6 Служебные классы: `@UtilityClass`
 
@@ -455,7 +533,8 @@ CSRF-токен после входа перевыпускается (5.1).
 
 - Ключевое слово `static` руками **не пишем** — Lombok делает члены статическими сам
   (проверено `javap`: в байт-коде они всё равно `public static`).
-- Применено к `support/TestFixtures`; Lombok подключён и для `default-testCompile`
+- Применено к `support/TestFixtures`, `support/FakeChatModel`, `utility/Interests`,
+  `utility/AiPrompts`; Lombok подключён и для `default-testCompile`
   (`maven-compiler-plugin`, `annotationProcessorPaths`).
 - `@Component`-классы, `@TestConfiguration` и базовые тест-классы (`PostgresRepositoryTest`,
   `PostgresTestConfiguration`, `WebTest`) аннотацию не получают: им нужен Spring или
@@ -468,9 +547,10 @@ CSRF-токен после входа перевыпускается (5.1).
 легко забыть обновить при добавлении зависимости, и он пересказывает то, что уже выражает
 аннотация (то же, что 6.5 и 6.6).
 
-- Проверено по всему проекту: `private final`-поля есть только у `controller/AuthController`
-  (4 зависимости) и `service/UserRegistrationService` (2 зависимости) — оба на
-  `@RequiredArgsConstructor`. Lombok подключён и для main, и для test.
+- Проверено по всему проекту: `private final`-поля есть у `controller/AuthController`
+  (4 зависимости), `service/UserRegistrationService` (2), `service/SpringAiGateway` (1),
+  `service/FallbackAiGateway` (2) — все на `@RequiredArgsConstructor`. Lombok подключён и для
+  main, и для test.
 - Исключения: JPA-сущности (поля не могут быть `final`, конструктор — часть доменного API),
   `EmailAlreadyTakenException` (считает строку и зовёт `super(...)`), классы без полей
   (`HomeController`, `SecurityConfig`), тесты (зависимости внедряются полями `@Autowired`).
@@ -488,13 +568,13 @@ CSRF-токен после входа перевыпускается (5.1).
 | `entity` | 6 JPA-сущностей: `AppUser`, `Profile`, `LearningSession`, `Question`, `ChatMessage`, `SessionReview` | Spring-сервисов, HTTP |
 | `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления маппятся `@Enumerated`) |
 | `repository` | 6 интерфейсов Spring Data JPA | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
-| `service` | `UserRegistrationService`, `ProfileService`, `SessionService` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
-| `dto` | `RegistrationForm`, `ProfileForm` + будущие records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
-| `exceptions` | `EmailAlreadyTakenException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
+| `service` | `UserRegistrationService`, `ProfileService`, `SessionService`, `AiGateway` + `SpringAiGateway`, `StubAiGateway`, `FallbackAiGateway` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
+| `dto` | `RegistrationForm`, `ProfileForm`, records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
+| `exceptions` | `EmailAlreadyTakenException`, `AiGatewayException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
 | `controller` | `AuthController`, `HomeController`, `OnboardingController`, `ProfileController` | Бизнес-логики, `@Entity`, прямого `Repository` |
-| `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`) | Контроллеров, сервисов, сущностей |
+| `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`), `AiGatewayConfig`, `AiProperties` | Контроллеров, сервисов, сущностей |
 | `security` | `AppUserDetails`, `OnboardingInterceptor` | `@Configuration` — это уже `config` |
-| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests` | `@Component`, `@Service`, состояния |
+| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests`, `AiPrompts` | `@Component`, `@Service`, состояния |
 
 Направления зависимостей (единственные разрешённые):
 
@@ -506,7 +586,10 @@ controller → service → repository → entity
 ```
 
 - `controller` знает `service`, `dto`, `security` (кто вошёл) и `config` (Spring сам);
-  `service` **не знает** про `controller` и `dto` — иначе бизнес-логика привяжется к HTTP.
+  `service` **не знает** про `controller`. `dto` в знает только `AiGateway`: обмен records-ами
+  structured output — сознательное исключение, обоснованное в 5.1.
+- `service` знает `dto` (только `AiGateway`), `entity`, `exceptions`, `utility`, `enums`
+  и Spring AI — но не HTTP. Именно поэтому `AiGateway` отделяет ИИ от остального приложения.
 - `security` знает `service` и `entity`: `OnboardingInterceptor` спрашивает `ProfileService`,
   есть ли профиль. Исключение из «`security` — лист», обоснованное в 5.1.
 - `repository` знает только `entity` и `enums`.
@@ -515,8 +598,10 @@ controller → service → repository → entity
   тестов идут без Spring).
 - `utility` и `exceptions` — листья: не зависят ни от кого, от них не зависят.
   `Interests` — тоже лист: `ProfileService` вызывает его статически, внедрять нечего.
-- Тесты повторяют структуру main: `entity/*`, `enums/*`, `controller/*`, `repository/*`;
-  тестовая инфраструктура — в `support` (`PostgresTestConfiguration`, базовые классы,
-  `TestFixtures`), это не `utility`: у базовых классов нет статических методов.
+  `AiPrompts` — лист: константы, которые читает `SpringAiGateway`.
+- Тесты повторяют структуру main: `entity/*`, `enums/*`, `controller/*`, `repository/*`,
+  `service/*`, `config/*`; тестовая инфраструктура — в `support` (`PostgresTestConfiguration`,
+  базовые классы, `TestFixtures`, `FakeChatModel`). `support` — это не `utility`: у базовых
+  классов нет статических методов.
 - **После переезда пакетов — обязателен `./mvnw clean test`:** в `target/` остаются `.class`
   старых пакетов, и без `clean` JUnit падает с `NoClassDefFoundError` на старых именах.

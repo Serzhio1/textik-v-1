@@ -17,16 +17,22 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
     default-schema: public
 
-  # --- Spring AI / Yandex (OpenAI-compatible endpoint) ---
-  # Плейсхолдер ниже нужен, чтобы из auto-configuration создались бины OpenAI.
-  # Заменить на настоящий ключ и endpoint Яндекса на Этапе 5.
+  # --- Spring AI: любой OpenAI-совместимый endpoint (Яндекс, OpenAI, Groq, Ollama и т.п.) ---
+  # Плейсхолдеры обязательны: без непустого api-key бины OpenAI не создаются (5.1).
+  # Смена провайдера и модели — только переменные окружения, код не меняется.
   ai:
     openai:
-      api-key: ${YANDEX_AI_API_KEY:set-placeholder-key}
-      base-url: ${YANDEX_AI_BASE_URL:https://set-me-later.example.invalid}
+      api-key: ${AI_API_KEY:set-placeholder-key}
+      base-url: ${AI_BASE_URL:https://set-me-later.example.invalid}
       chat:
         options:
-          model: ${YANDEX_AI_MODEL:set-me-later}
+          model: ${AI_MODEL:set-me-later}
+          temperature: ${AI_TEMPERATURE:0.7}
+
+app:
+  ai:
+    # none — без резервной модели; stub — при сбое основной отдаём заготовленный контент.
+    fallback: ${AI_FALLBACK:none}
 
 server:
   port: 8080
