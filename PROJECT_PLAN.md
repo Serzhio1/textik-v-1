@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 86 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 108 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -62,7 +62,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt. **Email = логин**; в `users` хранится `username` — имя (Sergey и т.п.), видно в профиле и в диалоге с ИИ |
 | 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, один артефакт |
 | 6 | Способ интеграции с LLM | **Spring AI** | Structured Output: модель отдаёт JSON → record в `dto` |
-| 7 | LLM-провайдер | **Любой OpenAI-совместимый endpoint** | Официального Spring AI-провайдера Яндекса нет, но `spring-ai-starter-model-openai` работает с любым OpenAI-совместимом API. Провайдер, модель и ключ задаются **только переменными окружения** (`AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`) — смена провайдера не требует правок кода. Модель по умолчанию не выбрана, ключа нет (5) |
+| 7 | LLM-провайдер | **GigaChat** (по умолчанию) + любой OpenAI-совместимый endpoint | Официального Spring AI-провайдера Яндекса нет, но `spring-ai-starter-model-openai` работает с любым OpenAI-совместимом API. Выбор — переменная `AI_PROVIDER` (`gigachat` \| `openai` \| `stub`) плюс `AI_BASE_URL`, `AI_MODEL`, `AI_TEMPERATURE`; ключ — `GIGACHAT_AUTH_KEY` или `AI_API_KEY`. Смена провайдера не требует правок кода. У GigaChat своя авторизация (OAuth, токен на 30 минут), поэтому ключ нельзя положить в `AI_API_KEY` — 5.1 |
 | 8 | Уровень пользователя (A1–B1) | **Ручной выбор в онбординге** | В исходном ТЗ поля нет, но тексты обязаны подбираться по уровню |
 | 9 | Аватар | **Без загрузки файлов** | В MVP — инициалы из `username`. Загрузка файлов вне скоупа |
 | 10 | Тип вопросов (Think) | **Только single-choice** | Один правильный из 4 вариантов, проверка детерминированная (сравнение с `correct_answer`). `q_type` и оценка открытых ответов убраны из MVP |
@@ -103,7 +103,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - `application.yaml`: datasource (env с дефолтами), `ddl-auto: validate`, `open-in-view: false`,
   Liquibase на `classpath:db/changelog/db.changelog-master.yaml`, плейсхолдеры
   `spring.ai.openai.*` с **обезличенными** именами переменных (`AI_API_KEY`, `AI_BASE_URL`,
-  `AI_MODEL`, `AI_TEMPERATURE`) и `app.ai.fallback`. Комментарии в файле — только «почему».
+  `AI_MODEL`, `AI_TEMPERATURE`), `app.ai.provider` и `app.ai.gigachat.*`
+  (`GIGACHAT_AUTH_KEY`, `GIGACHAT_AUTH_URL`, `GIGACHAT_SCOPE`), `app.ai.fallback`.
+  Комментарии в файле — только «почему».
 - `db/changelog/db.changelog-master.yaml` подключает `changesets/001-create-users`,
   `002-create-profiles`, `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
   `006-create-session-reviews`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
@@ -187,18 +189,25 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 | `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
 | `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~400 слов, 5 вопросов, реплики по ходу разговора, итоги |
 | `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
+| `service` | `GigaChatTokenService` | Обмен `Authorization key` на `access_token` (30 минут): кэш, обновление за минуту до истечения, один обмен под конкуренцией; ключ и токен не логируются |
 | `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | Records structured output |
 | `exceptions` | `AiGatewayException` | Единая ошибка слоя ИИ (endpoint, пустой ответ, неразбираемый JSON) |
 | `utility` | `AiPrompts` | 5 промптов (темы, текст, вопросы, обсуждение, ревью) как `@UtilityClass`-константы |
-| `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
+| `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` или `app.ai.provider=stub` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
+| `config` | `GigaChatClientConfig`, `GigaChatProperties` | При `app.ai.provider=gigachat`: клиент выдачи токена и перехватчик, подменяющий `Authorization` на `Bearer <access_token>` |
 
 Поведение:
 
-- **Смена провайдера — только конфиг.** Три переменные окружения: `AI_BASE_URL`, `AI_MODEL`,
-  `AI_API_KEY` (+ необязательный `AI_TEMPERATURE`). Работает любой OpenAI-совместимый endpoint
-  (Яндекс, OpenAI, Groq, Ollama). Код при смене провайдера не меняется.
-- **Офлайн без ключа.** Профиль `local` (`--spring.profiles.active=local`) подставляет
-  `StubAiGateway`: весь цикл Read→Think→Discuss→Review проходит без сети.
+- **Смена провайдера — только конфиг.** `AI_PROVIDER` выбирает провайдера: `gigachat`
+  (по умолчанию), `openai` или `stub`. Дальше — `AI_BASE_URL`, `AI_MODEL`, необязательный
+  `AI_TEMPERATURE` и ключ: `GIGACHAT_AUTH_KEY` для GigaChat либо `AI_API_KEY` для остальных.
+  Код при смене провайдера не меняется.
+- **У GigaChat токен живёт 30 минут.** `Authorization key` из Studio не является `api-key`:
+  он обменивается на `access_token` (`GigaChatTokenService`), а перехватчик
+  `OpenAiHttpClientBuilderCustomizer` подставляет `Bearer <access_token>` в каждый запрос.
+  Статический `AI_API_KEY` здесь неприменим — он протух быстрее первого же сеанса.
+- **Офлайн без ключа.** Профиль `local` (`--spring-profiles.active=local`) и `AI_PROVIDER=stub`
+  подставляют `StubAiGateway`: весь цикл Read→Think→Discuss→Review проходит без сети.
 - **Страховка.** `AI_FALLBACK=stub` оборачивает боевую модель в `FallbackAiGateway`: при сбое
   основной (таймаут, пустой ответ, неразбираемый JSON) ученик получает заготовленный контент,
   а в лог уходит предупреждение. Упали обе — выбрасывается `AiGatewayException`, у которого
@@ -209,15 +218,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 86, `./mvnw test` зелёные (~35 с)
+### 3.6 Тесты — 108, `./mvnw test` зелёные (~35 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
-| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3 | 18 |
+| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 25 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
 | Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 5 | 22 |
-| Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1 | 2 |
+| Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 3, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 17 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
 - Базовые классы в `support/`: `PostgresRepositoryTest` (`@DataJpaTest`), `PostgresIntegrationTest`
@@ -299,8 +308,12 @@ CSRF-токен после входа перевыпускается (5.1).
       3. 5–10 вопросов (один правильный из 4 вариантов) с правильными ответами и объяснениями;
       4. обсуждение — «держимся темы, возвращаем ушедшего» (лимит 3–5 обменов считает Этап 8);
       5. ревью — резюме, частые ошибки, оценка уровня разговора.
-- [x] **Заглушка** для профиля `local` без API-ключа + `FallbackAiGateway` как резервная модель.
-- [x] Проверка: 18 тестов слоя ИИ + 2 теста wiring, сеть не используется; полный цикл офлайн
+- [x] **Заглушка** для профиля `local` и `AI_PROVIDER=stub` без API-ключа + `FallbackAiGateway`
+      как резервная модель.
+- [x] **GigaChat как провайдер по умолчанию:** `GigaChatTokenService` (обмен `Authorization key`
+      на `access_token`, кэш, обновление за минуту до истечения, один обмен под конкуренцией) +
+      `GigaChatClientConfig` (перехватчик заголовка авторизации). Модель по умолчанию `GigaChat-2`.
+- [x] Проверка: 40 тестов слоя ИИ и конфигурации, сеть не используется; полный цикл офлайн
       проверяется на Этапах 6–9. Живой вызов с настоящим ключом — Этап 10.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
@@ -341,18 +354,30 @@ CSRF-токен после входа перевыпускается (5.1).
       дублирующей генерации.
 - [ ] Загрузочные состояния, валидация форм.
 - [ ] Тесты: проверка ответа, проверка владельца, генерация через stub.
-- [ ] README: как получить API-ключ (Яндекс/OpenAI/другой провайдер), какие поля конфига
-      заполнить: `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`, необязательный `AI_FALLBACK`;
-      живой вызов всех пяти методов `AiGateway`.
+- [ ] README: как получить ключ (GigaChat/OpenAI/другой провайдер), какие поля конфига
+      заполнить: `AI_PROVIDER`, `GIGACHAT_AUTH_KEY` или `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`,
+      необязательный `AI_FALLBACK`; живой вызов всех пяти методов `AiGateway`.
 - [ ] `./mvnw test` зелёный, полный пользовательский сценарий без падений.
 
 ---
 
 ## 5. Открытые вопросы
 
-- [ ] Получить API-ключ любого OpenAI-совместимого провайдера и выбрать модель; прописать
-      `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`. **Этап 5 кодом не блокирован** — слой готов и
-      работает офлайн на заглушке; блокирует только живой вызов (Этап 10, README).
+- [ ] **Доверие к сертификату `ngw.devices.sberbank.ru:9443`.** Ошибка зафиксирована вживую:
+      `PKIX path building failed: unable to find valid certification path to requested target`.
+      Хост выдачи токена отдаёт цепочку, которой нет в стандартном truststore JDK, поэтому
+      нужен корневой сертификат НУЦ Минцифры (`russian_trusted_root_ca.cer`) — отдельным
+      `TrustStore`/`SSLContext` только для клиента выдачи токена. `api.giga.chat` доверяется
+      штатно. **Этап 5 кодом не блокирован** — слой готов и работает офлайн на заглушке;
+      блокирует только живой вызов (Этап 10, README).
+- [ ] Получить `Authorization key` в проекте GigaChat API (Studio → Настройки API) и выбрать
+      модель; прописать `GIGACHAT_AUTH_KEY`, `AI_BASE_URL=https://api.giga.chat/v1`,
+      `AI_MODEL`. Модели из живого `GET /v1/models`: `GigaChat-2`, `GigaChat-2-Max`,
+      `GigaChat-2-Pro`, `GigaChat-3-Lightning`, `GigaChat-3-Pro`, `GigaChat-3-Ultra`
+      (в документации встречается устаревшее имя `GigaChat`, в ответе API его нет).
+- [ ] Условия использования и стоимость GigaChat: для новых клиентов с 01.09.2026 оплата через
+      cloud.ru; `GigaChat-3-Ultra` заявлен как Freemium для физических лиц. Для pet-проекта
+      приемлемо, коммерческое использование требует бизнес-тарифа.
 - [ ] Прогресс между сессиями пользователя (статистика по времени, «выучено слов» и т.п.) —
       вне скоупа MVP, кандидаты на следующую итерацию.
 
@@ -364,15 +389,32 @@ CSRF-токен после входа перевыпускается (5.1).
 
 - **Провайдер ИИ не зашит в код.** Только `spring.ai.openai.*` с переменными окружения
   `AI_BASE_URL` / `AI_MODEL` / `AI_API_KEY`: подходит любой OpenAI-совместимый endpoint
-  (Яндекс, OpenAI, Groq, Ollama). Добавить второго провайдера — новый класс, реализующий
-  `AiGateway`; переключить — одна переменная. Резервная модель включается `AI_FALLBACK=stub`
-  (`FallbackAiGateway`): при `AiGatewayException` основной модели отвечает заглушка.
+  (OpenAI, Groq, Ollama, GigaChat). Первый провайдер — GigaChat, у него своя выдача токена,
+  поэтому ключ приходит отдельной переменной, а `AI_PROVIDER` выбирает способ авторизации.
+  Добавить ещё провайдера с нестандартной авторизацией — новая `@Configuration` рядом с
+  `GigaChatClientConfig`; сменить провайдера — одна переменная. Резервная модель включается
+  `AI_FALLBACK=stub` (`FallbackAiGateway`): при `AiGatewayException` основной модели отвечает
+  заглушка.
 - **Structured Output делаем через `BeanOutputConverter`, а не через `response_format`:** схема
   JSON-схемой добавляется в текст промпта (`getFormat()`), поэтому не требуется поддержка
   `json_schema` на стороне провайдера — иначе часть OpenAI-совместимых API не заработала бы.
   Списки (`List<TopicProposal>`, `List<GeneratedQuestion>`) идут «голым» JSON-массивом,
   ответ в блоке ```json``` тоже разбирается. Нативный structured output Spring AI 2 — кандидат
-  на следующую итерацию, если у выбранного провайдера он гарантированно работает.
+  на следующую итерацию, если у выбранного провайдера он гарантированно работает. Выбор
+  `BeanOutputConverter` окупился на GigaChat: совместимость с OpenAI у него частичная, и
+  structured output — типичное место расхождений.
+- **Провайдера выбираем одним свойством `app.ai.provider`, а не профилями Spring:** профиль
+  `local` и `AI_PROVIDER=stub` означают одно и то же, поэтому два `@Profile`-бина `AiGateway`
+  конфликтовали бы. В `AiGatewayConfig` остаётся один бин, который выбирает заглушку по профилю
+  или по свойству и достаёт `ChatClient.Builder` через `ObjectProvider` — в офлайне клиент
+  Spring AI вообще не создаётся.
+- **Авторизацию GigaChat не встраиваем в `SpringAiGateway`:** `AiGateway` остаётся провайдер-
+  неагностичным, а разница только в HTTP-клиенте. Spring AI 2.0.1 больше не имеет `OpenAiApi`
+  (модель построена на `openai-java` 4.49), но у `OpenAiChatModel` есть
+  `httpClientBuilderCustomizer(...)`, поэтому `Authorization: Bearer` подменяется перехватчиком
+  OkHttp. Свой `ChatModel` не заводим намеренно: `chatClientBuilder(...)` ждёт ровно один
+  `ChatModel`, и `@ConditionalOnMissingBean` у автоконфигурации сверяется с типом
+  `OpenAiChatModel` — бин типа `ChatModel` не вытеснил бы штатный и появились бы два клиента.
 - **`AiGateway` лежит в плоском пакете `service`**, без вложенности `service/ai` (6.8): фича
   одна, роль одна. Из этого следует документированное исключение из правила «`service` не знает
   про `dto`» — шлюз обменивается records-ами `dto`. Обратной зависимости нет: `dto` не знает
@@ -409,7 +451,12 @@ CSRF-токен после входа перевыпускается (5.1).
 - **Liquibase 5.0.x: change type `addCheckConstraint` отсутствует** — CHECK-ограничения
   добавляются через `sql`-изменения в YAML-changelog.
 - **Spring AI OpenAI-стартер не поднимается без непустого `api-key`** — в `application.yaml`
-  стоят плейсхолдеры.
+  стоят плейсхолдеры. Для GigaChat ключ лежит отдельно (`GIGACHAT_AUTH_KEY`), а заголовок
+  авторизации перезаписывает перехватчик.
+- **`Authorization key` GigaChat кладём в Basic-заголовок как есть**, без base64: ключ уже
+  приходит готовым, а `scope` уходит телом запроса (`application/x-www-form-urlencoded`).
+- **OkHttp `Interceptor` — Kotlin-интерфейс,checked-исключения не объявляет**, поэтому ошибку
+  получения токена превращаем в `IllegalStateException`, а не в `IOException`.
 - **Логин по email, а не по `username`:** фильтр ждёт параметр `username`, поэтому в
   `SecurityConfig` указано `.usernameParameter("email")` — при переименовании поля формы
   придётся менять и его.
