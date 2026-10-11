@@ -56,9 +56,12 @@ AI_PROVIDER=gigachat GIGACHAT_AUTH_KEY=<key> AI_BASE_URL=https://api.giga.chat/v
 AI_PROVIDER=openai AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com AI_MODEL=gpt-4o-mini ./mvnw spring-boot:run
 ```
 
-> GigaChat выдаёт `access_token` на 30 минут и обменивает его сам, но хост выдачи токена
-> отдаёт цепочку сертификатов, которой нет в стандартном truststore JDK — живой вызов
-> потребует корневой сертификата НУЦ Минцифры. На тесты и офлайн-режим это не влияет.
+> Хост выдачи токена `ngw.devices.sberbank.ru:9443` отдаёт цепочку сертификатов, которой нет
+> в стандартном truststore JDK. На Debian/Ubuntu сертификаты НУЦ Минцифры уже в системном
+> store; чтобы JVM их увидела, добавьте в рантайм `-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts`
+> (или импортируйте их в `cacerts` используемого JDK). Ещё одна особенность GigaChat: ответ
+> `chat.completions` не содержит `id`, нужный openai-java SDK, — приложение само добавляет его
+> перехватчиком (`chatCompletionIdCustomizer`).
 
 ## Переменные БД
 

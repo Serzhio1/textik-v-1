@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 118 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 125 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -76,6 +76,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 17 | Ввод интересов | **Одно поле через запятую, показ — «чипсами»** | Без JS-редактора тегов: `Interests.split()` режет строку для показа, `Interests.normalize()` чистит и склеивает перед сохранением (`" технологии , спорт ,,"` → `"технологии, спорт"`) |
 | 18 | Момент генерации контента | **При создании сессии (выбор темы)** | Текст + вопросы генерируются сразу, сессия рождается в статусе `READ`, поднимается в БД. Обсуждение — живой ИИ по одному обмену (Этап 8); ревью — в конце (Этап 9). Сбой генерации → ничего не сохраняется, повтор на `/select` |
 | 19 | История на «Прогрессе» | **Только `DONE`-сессии** | Незавершённые сессии в истории не показываются: запрос `findByUserIdAndStatusOrderByIdDesc(userId, DONE)` |
+| 20 | Ответ `chat.completions` GigaChat | **Нет поля `id`, вставляет перехватчик** | GigaChat возвращает OpenAI-совместимый ответ без `id`, который обязателен для openai-java SDK (`id is not set`). Перехватчик `chatCompletionIdCustomizer` добавляет синтетический `id` только если в JSON есть `choices` и запрос шёл на `/chat/completions` |
 
 ### Следствия для архитектуры
 
@@ -200,7 +201,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 | `exceptions` | `AiGatewayException` | Единая ошибка слоя ИИ (endpoint, пустой ответ, неразбираемый JSON) |
 | `utility` | `AiPrompts` | 5 промптов (темы, текст, вопросы, обсуждение, ревью) как `@UtilityClass`-константы |
 | `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` или `app.ai.provider=stub` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
-| `config` | `GigaChatClientConfig`, `GigaChatProperties` | При `app.ai.provider=gigachat`: клиент выдачи токена и перехватчик, подменяющий `Authorization` на `Bearer <access_token>` |
+| `config` | `GigaChatClientConfig`, `GigaChatProperties` | При `app.ai.provider=gigachat`: клиент выдачи токена, перехватчик `Authorization` → `Bearer <access_token>` и перехватчик, добавляющий `id` в ответ `chat.completions` (20) |
 
 Поведение:
 
@@ -221,19 +222,22 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - **Structured Output без `response_format`.** JSON-схему добавляет `BeanOutputConverter.getFormat()`
   в текст промпта, поэтому не требуется поддержка `json_schema` на стороне провайдера — иначе
   часть OpenAI-совместимых API не заработала бы. Ответ в ```json```-блоке тоже разбирается.
+- **GigaChat недо-стандартен: в ответе `chat.completions` нет `id`.** openai-java SDK считает
+  `id` обязательным и падает (`id is not set`). Перехватчик `chatCompletionIdCustomizer`
+  добавляет синтетический `id` только на ответы `/chat/completions` с полем `choices` (20).
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 118, `./mvnw test` зелёные (~35 с)
+### 3.6 Тесты — 125, `./mvnw test` зелёные (~35 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
-| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3 | 3 |
+| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 5 | 8 |
 | Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 25 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
 | Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6 | 29 |
-| Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 3, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 17 |
+| Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
 - Базовые классы в `support/`: `PostgresRepositoryTest` (`@DataJpaTest`), `PostgresIntegrationTest`
@@ -391,18 +395,18 @@ CSRF-токен после входа перевыпускается (5.1).
 
 ## 5. Открытые вопросы
 
-- [ ] **Доверие к сертификату `ngw.devices.sberbank.ru:9443`.** Ошибка зафиксирована вживую:
-      `PKIX path building failed: unable to find valid certification path to requested target`.
-      Хост выдачи токена отдаёт цепочку, которой нет в стандартном truststore JDK, поэтому
-      нужен корневой сертификат НУЦ Минцифры (`russian_trusted_root_ca.cer`) — отдельным
-      `TrustStore`/`SSLContext` только для клиента выдачи токена. `api.giga.chat` доверяется
-      штатно. **Этап 5 кодом не блокирован** — слой готов и работает офлайн на заглушке;
-      блокирует только живой вызов (Этап 10, README).
-- [ ] Получить `Authorization key` в проекте GigaChat API (Studio → Настройки API) и выбрать
-      модель; прописать `GIGACHAT_AUTH_KEY`, `AI_BASE_URL=https://api.giga.chat/v1`,
-      `AI_MODEL`. Модели из живого `GET /v1/models`: `GigaChat-2`, `GigaChat-2-Max`,
-      `GigaChat-2-Pro`, `GigaChat-3-Lightning`, `GigaChat-3-Pro`, `GigaChat-3-Ultra`
-      (в документации встречается устаревшее имя `GigaChat`, в ответе API его нет).
+- [x] **Доверие к сертификату `ngw.devices.sberbank.ru:9443`.** Ошибка `PKIX path building
+      failed` закрыта вживую: сертификаты НУЦ Минцифры (`Russian_Trusted_Root_CA` и суб-ЦА)
+      установлены в системный store, а рантайм (Oracle JDK 23) указывает на него через
+      `-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts` (или импорт в свой `cacerts`).
+      `api.giga.chat` доверяется штатно. Отдельный `TrustStore`/`SSLContext` только для клиента
+      токена в коде не заводим — для MVP хватит конфигурации рантайма.
+- [x] **Живой вызов работает** после трёх поправок: ключ в `GIGACHAT_AUTH_KEY`, доверие к
+      сертификату хоста токена, и перехватчик `chatCompletionIdCustomizer`, добавляющий `id`
+      в ответ `chat.completions` (20). Поле `AI_BASE_URL=https://api.giga.chat/v1`, модель из
+      живого `GET /v1/models` (`GigaChat-2`, `GigaChat-2-Max`, `GigaChat-2-Pro`,
+      `GigaChat-3-Lightning`, `GigaChat-3-Pro`, `GigaChat-3-Ultra`; устаревшее имя `GigaChat`
+      в ответе API отсутствует).
 - [ ] Условия использования и стоимость GigaChat: для новых клиентов с 01.09.2026 оплата через
       cloud.ru; `GigaChat-3-Ultra` заявлен как Freemium для физических лиц. Для pet-проекта
       приемлемо, коммерческое использование требует бизнес-тарифа.

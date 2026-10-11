@@ -13,6 +13,7 @@ import okhttp3.Interceptor;
 import okhttp3.Protocol;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer;
@@ -31,15 +32,19 @@ class GigaChatClientConfigTests {
 			.withUserConfiguration(GigaChatClientConfig.class);
 
 	@Test
-	@DisplayName("Для GigaChat заводим сервис токена и перехватчик заголовка авторизации")
-	void registersTokenServiceAndAuthorizationInterceptor() {
+	@DisplayName("Для GigaChat заводим сервис токена и перехватчики авторизации и id")
+	void registersTokenServiceAndInterceptors() {
 		//Arrange
 		//Act
 		runner.withPropertyValues("app.ai.provider=gigachat", "app.ai.gigachat.auth-key=key").run(context -> {
 			//Assert
 			assertThat(context).hasSingleBean(GigaChatTokenService.class);
-			assertThat(context).hasSingleBean(OpenAiHttpClientBuilderCustomizer.class);
-			assertThat(interceptorOf(context.getBean(OpenAiHttpClientBuilderCustomizer.class))).isNotNull();
+			assertThat(context).hasBean("gigaChatAuthorizationCustomizer");
+			assertThat(context).hasBean("chatCompletionIdCustomizer");
+			assertThat(interceptorOf(context.getBean("gigaChatAuthorizationCustomizer",
+					OpenAiHttpClientBuilderCustomizer.class))).isNotNull();
+			assertThat(interceptorOf(context.getBean("chatCompletionIdCustomizer",
+					OpenAiHttpClientBuilderCustomizer.class))).isNotNull();
 		});
 	}
 
@@ -85,6 +90,61 @@ class GigaChatClientConfigTests {
 		List<Interceptor> interceptors = builder.build().getOkHttpClient().interceptors();
 		// Наш перехватчик добавляется последним, перед ним — перехватчик наблюдений Micrometer.
 		return interceptors.get(interceptors.size() - 1);
+	}
+
+	@Test
+	@DisplayName("В ответ GigaChat без id перехватчик добавляет id")
+	void injectsMissingChatCompletionId() throws IOException {
+		//Arrange
+		String withoutId = """
+				{"choices":[{"message":{"content":"Hi!","role":"assistant"},"index":0,"finish_reason":"stop"}],\
+				"object":"chat.completions","created":1791725138,"model":"GigaChat-2:2.0.30.01"}""";
+		Interceptor interceptor = interceptorOf(new GigaChatClientConfig().chatCompletionIdCustomizer());
+
+		//Act
+		Response result = interceptor.intercept(chainResponding(withoutId, CHAT_URL));
+
+		//Assert
+		assertThat(result.body().string())
+				.contains("\"id\":\"chatcmpl-")
+				.contains("\"choices\"")
+				.contains("\"model\":\"GigaChat-2:2.0.30.01\"");
+	}
+
+	@Test
+	@DisplayName("Запрос, не являющийся chat completions, перехватчик не меняет")
+	void leavesNonChatResponseUntouched() throws IOException {
+		//Arrange
+		String models = "[{\"id\":\"GigaChat-2\",\"object\":\"model\"}]";
+		Interceptor interceptor = interceptorOf(new GigaChatClientConfig().chatCompletionIdCustomizer());
+
+		//Act
+		Response result = interceptor.intercept(chainResponding(models, "https://api.giga.chat/v1/models"));
+
+		//Assert
+		assertThat(result.body().string()).isEqualTo(models);
+	}
+
+	private static final String CHAT_URL = "https://api.giga.chat/v1/chat/completions";
+
+	private Interceptor.Chain chainResponding(String body, String url) {
+		return (Interceptor.Chain) Proxy.newProxyInstance(
+				getClass().getClassLoader(),
+				new Class<?>[] {Interceptor.Chain.class},
+				(proxy, method, args) -> switch (method.getName()) {
+					case "request" -> new Request.Builder().url(url).build();
+					case "proceed" -> {
+						ResponseBody responseBody = ResponseBody.create(body, okhttp3.MediaType.get("application/json"));
+						yield new Response.Builder()
+								.request((Request) args[0])
+								.protocol(Protocol.HTTP_1_1)
+								.code(200)
+								.message("OK")
+								.body(responseBody)
+								.build();
+					}
+					default -> throw new UnsupportedOperationException(method.getName());
+				});
 	}
 
 	private Request captureAuthorizedRequest(Interceptor interceptor) throws IOException {
