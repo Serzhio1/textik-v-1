@@ -63,7 +63,7 @@ public class FallbackAiGateway implements AiGateway {
 		try {
 			return primaryCall.get();
 		} catch (AiGatewayException primaryFailure) {
-			log.warn("Основная модель не сработала ({}), переключаемся на резервную", primaryFailure.getMessage());
+			log.warn("Основная модель не сработала ({}), переключаемся на резервную", primaryFailure.getMessage(), primaryFailure);
 			try {
 				return fallbackCall.get();
 			} catch (AiGatewayException fallbackFailure) {

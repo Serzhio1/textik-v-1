@@ -194,8 +194,41 @@ class SpringAiGatewayTests {
 				.contains("А что ещё скажешь?");
 	}
 
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что неразбираемый ответ перезапрашивается один раз")
+	void retriesParseFailureOnce() {
+		//Arrange
+		SpringAiGateway gateway = gatewayAnsweringSequence("извините, я не смог", TOPICS_JSON);
+
+		//Act
+		List<TopicProposal> topics = gateway.generateTopics(profile);
+
+		//Assert
+		assertThat(topics).hasSize(3);
+		assertThat(topics.getFirst().title()).isEqualTo("Reading for Progress");
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что ответ с сырыми переносами строк чинится до разбора")
+	void parsesAnswerWithRawControlCharacters() {
+		//Arrange
+		String messy = "```json\n[{\"title\": \"Reading for Progress\", \"description\": \"О чём текст\", \"text\": \"Line one.\nLine two\"}]\n```";
+		SpringAiGateway gateway = gatewayAnswering(messy);
+
+		//Act
+		List<TopicProposal> topics = gateway.generateTopics(profile);
+
+		//Assert
+		assertThat(topics).hasSize(1);
+		assertThat(topics.getFirst().title()).isEqualTo("Reading for Progress");
+	}
+
 	private SpringAiGateway gatewayAnswering(String answer) {
 		return new SpringAiGateway(ChatClient.builder(FakeChatModel.answeringWith(answer)));
+	}
+
+	private SpringAiGateway gatewayAnsweringSequence(String first, String second) {
+		return new SpringAiGateway(ChatClient.builder(FakeChatModel.answeringWithSequence(List.of(first, second))));
 	}
 
 	private LearningSession session() {

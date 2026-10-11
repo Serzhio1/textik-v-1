@@ -7,11 +7,13 @@ import java.time.Clock;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 
+@Slf4j
 public class GigaChatTokenService {
 
 	private static final long EXPIRY_MARGIN_MILLIS = 60_000L;
@@ -57,8 +59,9 @@ public class GigaChatTokenService {
 
 	private void refresh() {
 		if (!properties.configured()) {
-			throw new AiGatewayException(
-					"Не задан GIGACHAT_AUTH_KEY: получите Authorization key в проекте GigaChat API (Studio → Настройки API)");
+			String message = "Не задан GIGACHAT_AUTH_KEY: получите Authorization key в проекте GigaChat API (Studio → Настройки API)";
+			log.warn(message);
+			throw new AiGatewayException(message);
 		}
 		try {
 			AccessToken response = restClient.post()
@@ -80,6 +83,7 @@ public class GigaChatTokenService {
 		} catch (AiGatewayException e) {
 			throw e;
 		} catch (RuntimeException e) {
+			log.warn("Не удалось получить access token GigaChat: {}", e.getMessage(), e);
 			throw new AiGatewayException("Не удалось получить access token GigaChat", e);
 		}
 	}

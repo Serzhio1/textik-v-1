@@ -13,6 +13,7 @@ import com.makhov_pet_projects.textik_v_1.service.SessionService;
 import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class SessionController {
@@ -55,6 +57,7 @@ public class SessionController {
 			LearningSession session = sessions.createWithContent(user.id(), profile.getLevel(), text, questions);
 			return "redirect:/sessions/" + session.getId() + "/read";
 		} catch (AiGatewayException e) {
+			log.warn("Не удалось подготовить материалы сессии, перенаправляем на /select?error=1", e);
 			return "redirect:/select?error=1";
 		}
 	}

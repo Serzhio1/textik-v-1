@@ -82,6 +82,22 @@ class ChatCompletionIdsTests {
 		assertThat(result).isEqualTo(invalid);
 	}
 
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что неэкранированные управляющие символы из ответа GigaChat исправляются")
+	void escapesRawControlCharacters() throws Exception {
+		//Arrange
+		String messy = "{\"choices\":[{\"message\":{\"content\":\"Line1\nLine2\",\"role\":\"assistant\"}}],"
+				+ "\"created\":1,\"object\":\"chat.completions\"}";
+
+		//Act
+		String result = ChatCompletionIds.ensureId(messy, "chatcmpl-test");
+
+		//Assert
+		JsonNode node = MAPPER.readTree(result);
+		assertThat(node.path("id").asText()).isEqualTo("chatcmpl-test");
+		assertThat(node.at("/choices/0/message/content").asText()).isEqualTo("Line1\nLine2");
+	}
+
 	private ObjectNode withoutId(JsonNode node) {
 		ObjectNode copy = node.deepCopy();
 		copy.remove("id");

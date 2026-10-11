@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 125 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 134 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -76,7 +76,8 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 17 | Ввод интересов | **Одно поле через запятую, показ — «чипсами»** | Без JS-редактора тегов: `Interests.split()` режет строку для показа, `Interests.normalize()` чистит и склеивает перед сохранением (`" технологии , спорт ,,"` → `"технологии, спорт"`) |
 | 18 | Момент генерации контента | **При создании сессии (выбор темы)** | Текст + вопросы генерируются сразу, сессия рождается в статусе `READ`, поднимается в БД. Обсуждение — живой ИИ по одному обмену (Этап 8); ревью — в конце (Этап 9). Сбой генерации → ничего не сохраняется, повтор на `/select` |
 | 19 | История на «Прогрессе» | **Только `DONE`-сессии** | Незавершённые сессии в истории не показываются: запрос `findByUserIdAndStatusOrderByIdDesc(userId, DONE)` |
-| 20 | Ответ `chat.completions` GigaChat | **Нет поля `id`, вставляет перехватчик** | GigaChat возвращает OpenAI-совместимый ответ без `id`, который обязателен для openai-java SDK (`id is not set`). Перехватчик `chatCompletionIdCustomizer` добавляет синтетический `id` только если в JSON есть `choices` и запрос шёл на `/chat/completions` |
+| 20 | Ответ `chat.completions` GigaChat | **Недо-стандартный: нет `id` и бывает «сырой» JSON** | GigaChat не шлёт `id` (обязателен для openai-java SDK) и иногда вставляет неэкранированные control-символы внутрь JSON-строк (`Invalid control character`). Перехватчик `chatCompletionIdCustomizer` на ответах `/chat/completions` с `choices` перечитывает JSON «мягко» (`JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS`), добавляет синтетический `id` и пере-сериализует — управляющие символы экранируются, SDK получает валидное тело |
+| 21 | Контент `content` GigaChat | **Тройная защита: промпт + санитайзер + ретрай** | Модель кладёт в `content` JSON с «сырыми» (неэкранированными) переносами строк внутри строк — строгий разбор `BeanOutputConverter` (Jackson 3) падает, либо выдаёт дегенеративный ответ (`"description"`). Защита: (1) в промпт добавлены жёсткие правила «никаких ```json-блоков, реальный Enter внутри строк запрещён — пиши `\n`»; (2) `ChatCompletionJson.sanitize()` перечитывает блок «мягким» парсером и пере-сериализует; (3) при неразобранном ответе структурный вызов повторяется один раз. Каждый сбой и сам «сырой» ответ модели пишутся в лог |
 
 ### Следствия для архитектуры
 
@@ -222,19 +223,31 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - **Structured Output без `response_format`.** JSON-схему добавляет `BeanOutputConverter.getFormat()`
   в текст промпта, поэтому не требуется поддержка `json_schema` на стороне провайдера — иначе
   часть OpenAI-совместимых API не заработала бы. Ответ в ```json```-блоке тоже разбирается.
-- **GigaChat недо-стандартен: в ответе `chat.completions` нет `id`.** openai-java SDK считает
-  `id` обязательным и падает (`id is not set`). Перехватчик `chatCompletionIdCustomizer`
-  добавляет синтетический `id` только на ответы `/chat/completions` с полем `choices` (20).
+- **GigaChat недо-стандартен: в ответе `chat.completions` нет `id` и иногда «сырой» JSON.**
+  openai-java SDK считает `id` обязательным и падает (`id is not set`); строгие парсеры
+  отвергают неэкранированные control-символы. Перехватчик `chatCompletionIdCustomizer`
+  на `/chat/completions` с полем `choices` читает JSON ленивым парсером, добавляет
+  синтетический `id` и пере-сериализует ответ — он становится валидным (20).
+- **Модель кладёт в `content` JSON с «сырыми» переносами строк** (реальный Enter внутри
+  строки `"text": "…\n…"`) или отвечает дегенеративно (`"description"`). Тройная защита
+  (21): жёсткие правила в промпте, `ChatCompletionJson.sanitize()` (мягкий разбор +
+  пере-сериализация, снимает ```json-блоки) и один повторный запрос при неразобранном
+  ответе. `BeanOutputConverter` получает уже валидный JSON.
+- **Логирование ИИ-слоя.** Каждый сбой виден в консоли: `SpringAiGateway` пишет причину
+  (`Запрос к модели не удался`, `Не удалось разобрать ответ модели` + текст самого ответа,
+  `повторяю запрос`), `GigaChatTokenService` — проблемы токена, `FallbackAiGateway` —
+  переключение на резервную, `SessionController` — факт перенаправления на
+  `/select?error=1` со стеком.
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 125, `./mvnw test` зелёные (~35 с)
+### 3.6 Тесты — 134, `./mvnw test` зелёные (~35 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
-| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 5 | 8 |
-| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 25 |
+| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6 | 15 |
+| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 12, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 27 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
 | Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6 | 29 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |

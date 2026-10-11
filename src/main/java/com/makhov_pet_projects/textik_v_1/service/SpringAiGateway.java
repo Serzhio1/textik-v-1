@@ -12,16 +12,27 @@ import com.makhov_pet_projects.textik_v_1.entity.Question;
 import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
 import com.makhov_pet_projects.textik_v_1.exceptions.AiGatewayException;
 import com.makhov_pet_projects.textik_v_1.utility.AiPrompts;
+import com.makhov_pet_projects.textik_v_1.utility.ChatCompletionJson;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.converter.StructuredOutputConverter;
 import org.springframework.core.ParameterizedTypeReference;
 
+@Slf4j
 @RequiredArgsConstructor
 public class SpringAiGateway implements AiGateway {
+
+	private static final int STRUCTURED_ATTEMPTS = 2;
+
+	private static final String STRICT_JSON_RULES = """
+			\n\nДополнительные правила ответа (обязательные):
+			- Верни только JSON: без кода-блоков ```json, без слов и пояснений до или после.
+			- Внутри строк JSON нельзя нажимать реальный Enter: каждый перенос строки записывается как два символа \\n.
+			- Ответ должен разбираться строгим JSON-парсером без ошибок.""";
 
 	private final ChatClient.Builder chatClientBuilder;
 
@@ -77,7 +88,20 @@ public class SpringAiGateway implements AiGateway {
 	}
 
 	private <T> T askStructured(StructuredOutputConverter<T> converter, String system, String user) {
-		return convert(converter, ask(system, user + "\n\n" + converter.getFormat()));
+		String prompt = user + "\n\n" + converter.getFormat() + STRICT_JSON_RULES;
+		int attempt = 0;
+		while (true) {
+			String answer = ask(system, prompt);
+			try {
+				return convert(converter, answer);
+			} catch (AiGatewayException parseFailure) {
+				if (++attempt >= STRUCTURED_ATTEMPTS) {
+					throw parseFailure;
+				}
+				log.warn("Ответ модели не удалось разобрать (попытка {} из {}), повторяю запрос: {}",
+						attempt, STRUCTURED_ATTEMPTS, parseFailure.getMessage());
+			}
+		}
 	}
 
 	private String ask(String system, String user) {
@@ -89,22 +113,33 @@ public class SpringAiGateway implements AiGateway {
 					.call()
 					.content();
 			if (answer == null || answer.isBlank()) {
+				log.warn("Модель вернула пустой ответ");
 				throw new AiGatewayException("Модель вернула пустой ответ");
 			}
 			return answer;
 		} catch (AiGatewayException e) {
 			throw e;
 		} catch (RuntimeException e) {
+			log.warn("Запрос к модели не удался: {}", e.getMessage(), e);
 			throw new AiGatewayException("Не удалось получить ответ модели", e);
 		}
 	}
 
 	private <T> T convert(StructuredOutputConverter<T> converter, String answer) {
 		try {
-			return converter.convert(answer);
+			return converter.convert(ChatCompletionJson.sanitize(answer));
 		} catch (RuntimeException e) {
+			log.warn("Не удалось разобрать ответ модели: {}", e.getMessage(), e);
+			log.warn("Текст ответа модели: {}", preview(answer));
 			throw new AiGatewayException("Не удалось разобрать ответ модели", e);
 		}
+	}
+
+	private String preview(String answer) {
+		if (answer.length() <= 2000) {
+			return answer;
+		}
+		return answer.substring(0, 1990) + "… [обрезано, всего " + answer.length() + " символов]";
 	}
 
 	private String conversation(LearningSession session) {

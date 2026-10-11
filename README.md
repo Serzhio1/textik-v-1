@@ -59,9 +59,12 @@ AI_PROVIDER=openai AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com AI_MODEL
 > Хост выдачи токена `ngw.devices.sberbank.ru:9443` отдаёт цепочку сертификатов, которой нет
 > в стандартном truststore JDK. На Debian/Ubuntu сертификаты НУЦ Минцифры уже в системном
 > store; чтобы JVM их увидела, добавьте в рантайм `-Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts`
-> (или импортируйте их в `cacerts` используемого JDK). Ещё одна особенность GigaChat: ответ
-> `chat.completions` не содержит `id`, нужный openai-java SDK, — приложение само добавляет его
-> перехватчиком (`chatCompletionIdCustomizer`).
+> (или импортируйте их в `cacerts` используемого JDK). Ещё две особенности GigaChat: ответ
+> `chat.completions` не содержит `id`, нужный openai-java SDK, и модель любит вставлять в JSON
+> «сырые» переносы строк (плюс обрамлять ответ в ```json). Приложение чинит это само: перехватчик
+> (`chatCompletionIdCustomizer`) добавляет `id`, санитайзер (`ChatCompletionJson`) экранирует
+> переносы и снимает обрамление, промпт жёстко требует чистый JSON, а неразобранный ответ
+> перезапрашивается один раз. Все ошибки ИИ-слоя (и текст «сырого» ответа) логируются в консоль.
 
 ## Переменные БД
 
