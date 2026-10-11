@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 108 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 112 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -58,7 +58,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 |---|--------|---------|--------|
 | 1 | Источник контента | **Генерация через LLM API** | Тексты и вопросы генерирует ИИ из профиля (интересы + уровень), готового контент-сида нет |
 | 2 | Обсуждение (Discuss) | **Реальный LLM через API** | Диалог ведёт модель, не скрипт |
-| 3 | База данных | **PostgreSQL через `compose.yaml`** | Контейнер `postgres:17`, том, healthcheck, порт **5433** (5432 занят локальным Postgres). Модуль docker-compose Spring Boot 4 не используем: контейнер для разработки поднимается вручную |
+| 3 | База данных | **PostgreSQL через `compose.yaml`** | Контейнер `postgres:17-alpine`, том, healthcheck, порт **5433** (5432 занят локальным Postgres). Модуль docker-compose Spring Boot 4 не используем: контейнер для разработки поднимается вручную |
 | 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt. **Email = логин**; в `users` хранится `username` — имя (Sergey и т.п.), видно в профиле и в диалоге с ИИ |
 | 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, один артефакт |
 | 6 | Способ интеграции с LLM | **Spring AI** | Structured Output: модель отдаёт JSON → record в `dto` |
@@ -95,11 +95,12 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 
 - Spring Boot **4.1.1** (parent), Java **21** в pom, Maven Wrapper (`./mvnw`).
 - `pom.xml`: `thymeleaf`, `webmvc`, `data-jpa`, `security`, `validation`,
-  `thymeleaf-extras-springsecurity6` (3.1.5), `spring-boot-starter-liquibase` + `liquibase-core`,
+  `thymeleaf-extras-springsecurity6` (версию держит Boot parent), `spring-boot-starter-liquibase`
+  + `liquibase-core`,
   `postgresql` (runtime), **Spring AI 2.0.1** (BOM + `spring-ai-starter-model-openai`),
   `docker-compose`, Lombok, тест-стартеры (`spring-boot-starter-webmvc-test`,
   `spring-security-test`, `spring-boot-testcontainers`, `testcontainers-postgresql`).
-- `compose.yaml`: Postgres 17, БД/пользователь/пароль `textik`, том, healthcheck, порт **5433**.
+- `compose.yaml`: Postgres 17-alpine, БД/пользователь/пароль `textik`, том, healthcheck, порт **5433**.
 - `application.yaml`: datasource (env с дефолтами), `ddl-auto: validate`, `open-in-view: false`,
   Liquibase на `classpath:db/changelog/db.changelog-master.yaml`, плейсхолдеры
   `spring.ai.openai.*` с **обезличенными** именами переменных (`AI_API_KEY`, `AI_BASE_URL`,
@@ -171,8 +172,9 @@ Spring Security 7, form login + BCrypt, миграции не потребова
   302 на `/onboarding` (15). `/onboarding` для пользователя с профилем — 302 на `/progress`,
   чтобы нельзя было затереть профиль повторно. Уровень выбирается «карточками»-радио
   (`A1`/`A2`/`B1`), интересы — одним полем через запятую; при сохранении 302 на `/`.
-- **Профиль.** `/progress` показывает имя, email, уровень, «чипсы» интересов и текст «О себе»;
-  ниже форма редактирования тех же трёх полей. Имя и email только показываются (16). Успех →
+- **Профиль.** `/progress` показывает имя с аватаром-инициалами (9), email, уровень, «чипсы»
+  интересов и текст «О себе»; ниже форма редактирования тех же трёх полей. Имя и email только
+  показываются (16). Успех →
   302 на `/progress?saved` + зелёное уведомление «Профиль сохранён». Ошибка валидации →
   форма с русскими сообщениями, в базе старое значение.
 - **Прогресс.** Секция «История сессий»: счётчик `sessionCount` и список тем со статусом;
@@ -218,14 +220,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 108, `./mvnw test` зелёные (~35 с)
+### 3.6 Тесты — 112, `./mvnw test` зелёные (~35 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
+| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3 | 3 |
 | Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 10, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 25 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 5 | 22 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6 | 23 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 3, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 17 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
@@ -568,8 +571,9 @@ CSRF-токен после входа перевыпускается (5.1).
    устаревший комментарий хуже отсутствующего.
 
 Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — четыре пояснения
-«почему» (плейсхолдеры `spring.ai.openai.*` и `app.ai.fallback`); в тестах — только
-`//Arrange //Act //Assert`.
+«почему» (`spring.ai.openai.*`, `app.ai.provider`, `app.ai.fallback`,
+`app.ai.gigachat.auth-key`) и одно в `application-test.yaml` (почему файл называется не
+`application.yaml`); в тестах — только `//Arrange //Act //Assert`.
 
 ### 6.6 Служебные классы: `@UtilityClass`
 
@@ -647,7 +651,8 @@ controller → service → repository → entity
   `Interests` — тоже лист: `ProfileService` вызывает его статически, внедрять нечего.
   `AiPrompts` — лист: константы, которые читает `SpringAiGateway`.
 - Тесты повторяют структуру main: `entity/*`, `enums/*`, `controller/*`, `repository/*`,
-  `service/*`, `config/*`; тестовая инфраструктура — в `support` (`PostgresTestConfiguration`,
+  `service/*`, `config/*`, `utility/*`; тестовая инфраструктура — в `support`
+  (`PostgresTestConfiguration`,
   базовые классы, `TestFixtures`, `FakeChatModel`). `support` — это не `utility`: у базовых
   классов нет статических методов.
 - **После переезда пакетов — обязателен `./mvnw clean test`:** в `target/` остаются `.class`

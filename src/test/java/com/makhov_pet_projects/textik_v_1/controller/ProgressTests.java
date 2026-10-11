@@ -51,6 +51,21 @@ class ProgressTests extends WebTest {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что на странице прогресса виден аватар с инициалами")
+	void showsInitialsAvatar() throws Exception {
+		//Arrange
+		AppUser user = TestFixtures.userWithProfile(users, profiles);
+
+		//Act
+		mockMvc.perform(get("/progress").with(user(AppUserDetails.of(user))))
+
+		//Assert
+		.andExpect(status().isOk())
+		.andExpect(content().string(containsString("class=\"avatar\"")))
+		.andExpect(content().string(containsString(">S</span")));
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что пользователя без профиля отправляет на онбординг")
 	void redirectsUserWithoutProfileToOnboarding() throws Exception {
 		//Arrange

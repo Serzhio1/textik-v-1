@@ -12,10 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 
-/**
- * Обменивает Authorization key на короткоживущий access token GigaChat (30 минут)
- * и отдаёт актуальный токен. Ключ и токен нигде не логируются.
- */
 public class GigaChatTokenService {
 
 	private static final long EXPIRY_MARGIN_MILLIS = 60_000L;

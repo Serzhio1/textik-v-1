@@ -6,6 +6,7 @@ import com.makhov_pet_projects.textik_v_1.entity.Profile;
 import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
 import com.makhov_pet_projects.textik_v_1.service.ProfileService;
 import com.makhov_pet_projects.textik_v_1.service.SessionService;
+import com.makhov_pet_projects.textik_v_1.utility.Initials;
 import com.makhov_pet_projects.textik_v_1.utility.Interests;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -63,6 +64,7 @@ public class ProfileController {
 	private void addCommonAttributes(Model model, AppUserDetails user, Profile profile) {
 		List<LearningSession> history = sessions.findHistory(user.id());
 		model.addAttribute("displayName", user.displayName());
+		model.addAttribute("initials", Initials.of(user.displayName()));
 		model.addAttribute("email", user.email());
 		model.addAttribute("interestList", Interests.split(profile.getInterests()));
 		model.addAttribute("levels", ProfileForm.LEVELS);

@@ -10,7 +10,10 @@
 
 	<section class="section">
 		<h2 class="section-title">Профиль</h2>
-		<p class="meta">Имя: <span th:text="${displayName}">друг</span></p>
+		<p class="profile-head">
+			<span class="avatar" th:text="${initials}">S</span>
+			<span class="meta">Имя: <span th:text="${displayName}">друг</span></span>
+		</p>
 		<p class="meta">Email: <span th:text="${email}">user@example.com</span></p>
 		<p class="meta">Уровень: <span th:text="${profileForm.level}">A1</span></p>
 		<div class="chips" th:if="${not #lists.isEmpty(interestList)}">

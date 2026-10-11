@@ -12,10 +12,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-/**
- * Подменяет статический api-key на короткоживущий access token GigaChat.
- * Модель собирает автоконфигурация Spring AI, поэтому здесь только HTTP-клиент для OAuth.
- */
 @Configuration
 @ConditionalOnProperty(prefix = "app.ai", name = "provider", havingValue = AiProperties.PROVIDER_GIGACHAT)
 @EnableConfigurationProperties(GigaChatProperties.class)

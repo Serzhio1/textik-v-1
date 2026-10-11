@@ -10,9 +10,9 @@ import org.testcontainers.utility.DockerImageName;
 public class PostgresTestConfiguration {
 
     @Bean
-    @ServiceConnection
-    PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"));
-    }
+	@ServiceConnection
+	PostgreSQLContainer postgresContainer() {
+		return new PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"));
+	}
 
 }

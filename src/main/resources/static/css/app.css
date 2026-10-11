@@ -192,6 +192,26 @@ button.link-button:hover {
 	font-size: 14px;
 }
 
+.profile-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 4px;
+}
+
+.avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: #2f4f9e;
+	color: #fff;
+	font-size: 15px;
+	font-weight: 600;
+}
+
 .about {
 	margin: 12px 0 0;
 	white-space: pre-wrap;

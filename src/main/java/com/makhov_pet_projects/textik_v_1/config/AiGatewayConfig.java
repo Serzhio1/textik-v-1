@@ -16,10 +16,6 @@ import org.springframework.core.env.Profiles;
 @EnableConfigurationProperties(AiProperties.class)
 public class AiGatewayConfig {
 
-	/**
-	 * Один бин вместо @Profile-вариантов: профиль local и app.ai.provider=stub
-	 * не должны заводить два AiGateway одновременно.
-	 */
 	@Bean
 	AiGateway aiGateway(AiProperties properties, Environment environment,
 			ObjectProvider<ChatClient.Builder> chatClientBuilder) {
