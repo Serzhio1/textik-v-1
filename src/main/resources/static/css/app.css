@@ -306,3 +306,91 @@ button.link-button:hover {
 	padding: 12px 0;
 	border-bottom: 1px solid #eef0f5;
 }
+
+.stages {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 12px;
+	margin: 24px 0;
+}
+
+.stage {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 16px;
+	border: 1px solid #e2e6ee;
+	border-radius: 10px;
+	background: #fafbfd;
+}
+
+.stage__name {
+	font-size: 18px;
+	font-weight: 600;
+	color: #2f4f9e;
+}
+
+.stage__desc {
+	font-size: 13px;
+	color: #5a6270;
+}
+
+.stage__time {
+	margin-top: auto;
+	font-size: 13px;
+	font-weight: 600;
+	color: #1f2430;
+}
+
+.button-start {
+	display: block;
+	padding: 12px;
+	border-radius: 8px;
+	background: #2f6fed;
+	color: #fff;
+	font-size: 15px;
+	text-align: center;
+	text-decoration: none;
+}
+
+.button-start:hover {
+	background: #2456c4;
+}
+
+.topics {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 16px;
+}
+
+.topic {
+	padding: 16px;
+	border: 1px solid #e2e6ee;
+	border-radius: 10px;
+	background: #fafbfd;
+}
+
+.topic__title {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+
+.topic__desc {
+	margin: 0 0 16px;
+	font-size: 14px;
+	color: #5a6270;
+}
+
+.button-disabled {
+	margin-top: 32px;
+	background: #eceff4;
+	color: #8b93a1;
+	cursor: not-allowed;
+}
+
+.reading {
+	margin: 24px 0 0;
+	white-space: pre-wrap;
+	font-size: 16px;
+	line-height: 1.7;
+}

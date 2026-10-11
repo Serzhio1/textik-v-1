@@ -12,7 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.makhov_pet_projects.textik_v_1.entity.AppUser;
+import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
 import com.makhov_pet_projects.textik_v_1.entity.Profile;
+import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.ProfileRepository;
 import com.makhov_pet_projects.textik_v_1.repository.SessionRepository;
@@ -128,7 +130,9 @@ class ProgressTests extends WebTest {
 	void showsSessionHistory() throws Exception {
 		//Arrange
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
-		TestFixtures.session(sessions, user, "Отпуск в Англии");
+		LearningSession finished = TestFixtures.session(sessions, user, "Отпуск в Англии");
+		finished.setStatus(SessionStatus.DONE);
+		sessions.saveAndFlush(finished);
 
 		//Act
 		mockMvc.perform(get("/progress").with(user(AppUserDetails.of(user))))

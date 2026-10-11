@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Чтение')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('home')}"></nav>
+
+<main class="card card--wide">
+	<h1 th:text="${learningSession.title}">Тема</h1>
+	<p class="topic__desc" th:text="${learningSession.description}">Описание</p>
+	<div class="reading" th:text="${learningSession.textContent}">Текст</div>
+
+	<button type="button" class="button-disabled" disabled
+			title="Появится на следующем этапе">К вопросам — следующий этап</button>
+</main>
+</body>
+</html>

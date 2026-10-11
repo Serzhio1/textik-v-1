@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Выбор темы')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('home')}"></nav>
+
+<main class="card card--wide">
+	<h1>Выберите тему</h1>
+	<p class="notice error" th:if="${param.error}">Не удалось подготовить материалы. Попробуйте ещё раз позже.</p>
+	<p class="hint-inline hint-inline--top">Темы подобраны под ваши интересы и уровень.</p>
+
+	<div class="topics" th:if="${not #lists.isEmpty(topics)}">
+		<div class="topic" th:each="topic, stat : ${topics}">
+			<h2 class="topic__title" th:text="${topic.title}">Тема</h2>
+			<p class="topic__desc" th:text="${topic.description}">Описание</p>
+			<form th:action="@{/sessions}" action="/sessions" method="post">
+				<input type="hidden" name="topic" th:value="${stat.index}">
+				<button type="submit">Начать чтение</button>
+			</form>
+		</div>
+	</div>
+</main>
+</body>
+</html>

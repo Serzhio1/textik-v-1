@@ -4,10 +4,35 @@
 <body>
 <nav th:replace="~{fragments :: nav('home')}"></nav>
 
-<main class="card">
-	<h1>Привет, <span th:text="${displayName}">друг</span>!</h1>
-	<p class="hint-inline hint-inline--top">Экран сессии с темами и текстом появится на следующем этапе,
-		а пока можно заглянуть в <a th:href="@{/progress}" href="/progress">прогресс</a>.</p>
+<main class="card card--wide">
+	<h1>textik</h1>
+	<p class="hint-inline hint-inline--top">Привет, <span th:text="${displayName}">друг</span>! Одна сессия — 40–50 минут вдумчивого
+		чтения и практики английского.</p>
+
+	<div class="stages">
+		<div class="stage">
+			<span class="stage__name">Read</span>
+			<span class="stage__desc">читаете текст по интересам и уровню</span>
+			<span class="stage__time">~20 мин</span>
+		</div>
+		<div class="stage">
+			<span class="stage__name">Think</span>
+			<span class="stage__desc">отвечаете на вопросы с объяснением ошибок</span>
+			<span class="stage__time">5–10 мин</span>
+		</div>
+		<div class="stage">
+			<span class="stage__name">Discuss</span>
+			<span class="stage__desc">обсуждаете текст с ИИ, он держит тему</span>
+			<span class="stage__time">15–20 мин</span>
+		</div>
+		<div class="stage">
+			<span class="stage__name">Review</span>
+			<span class="stage__desc">итоги, ошибки и план на следующий раз</span>
+			<span class="stage__time">~5 мин</span>
+		</div>
+	</div>
+
+	<a class="button-start" th:href="@{/select}" href="/select">Начать сессию</a>
 </main>
 </body>
 </html>
