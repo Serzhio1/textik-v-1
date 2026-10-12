@@ -6,16 +6,16 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record ProfileForm(
-		@NotBlank(message = "Расскажите о себе")
-		@Size(max = 2000, message = "Слишком длинный текст — максимум 2000 символов")
+		@NotBlank(message = "Tell us about yourself")
+		@Size(max = 2000, message = "Text is too long — maximum 2000 characters")
 		String about,
 
-		@NotBlank(message = "Укажите увлечения")
-		@Size(max = 500, message = "Слишком длинный список — максимум 500 символов")
+		@NotBlank(message = "Enter your interests")
+		@Size(max = 500, message = "List is too long — maximum 500 characters")
 		String interests,
 
-		@NotBlank(message = "Выберите уровень")
-		@Pattern(regexp = LEVELS_PATTERN, message = "Выберите уровень A1, A2 или B1")
+		@NotBlank(message = "Choose a level")
+		@Pattern(regexp = LEVELS_PATTERN, message = "Choose level A1, A2 or B1")
 		String level) {
 
 	public static final List<String> LEVELS = List.of("A1", "A2", "B1");

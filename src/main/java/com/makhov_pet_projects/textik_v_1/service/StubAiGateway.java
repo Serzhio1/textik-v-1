@@ -11,9 +11,9 @@ import java.util.List;
 public class StubAiGateway implements AiGateway {
 
 	private static final List<TopicProposal> TOPICS = List.of(
-			new TopicProposal("Reading for Progress", "Почему ежедневное чтение полезнее, чем разовые занятия"),
-			new TopicProposal("Notetaking That Works", "Как записывать мысли так, чтобы к ним возвращаться"),
-			new TopicProposal("Small Habits, Big Results", "Почему маленькие ежедневные привычки дают больше, чем редкие подвиги"));
+			new TopicProposal("Reading for Progress", "Why daily reading beats one-off study sessions"),
+			new TopicProposal("Notetaking That Works", "How to take notes you will actually return to"),
+			new TopicProposal("Small Habits, Big Results", "Why small daily habits beat rare heroic efforts"));
 
 	private static final String TEXT = """
 			Reading is one of the most reliable ways to improve your English skills. When you read \
@@ -48,45 +48,45 @@ public class StubAiGateway implements AiGateway {
 
 	private static final List<GeneratedQuestion> QUESTIONS = List.of(
 			new GeneratedQuestion(
-					"Почему автор советует выбирать текст по уровню?",
-					List.of("Чтобы читать было быстрее",
-							"Чтобы текст был слишком лёгким",
-							"Чтобы не бросить чтение и получать новые слова",
-							"Чтобы тратить меньше времени"),
-					"Чтобы не бросить чтение и получать новые слова",
-					"Слишком сложный текст заставляет бросить чтение, а слишком лёгкий не даёт прогресса. Нужен баланс."),
+					"Why does the author advise choosing a text that matches your level?",
+					List.of("To read faster",
+							"So that the text is too easy",
+							"So that you keep reading and still meet new words",
+							"So that you spend less time"),
+					"So that you keep reading and still meet new words",
+					"A text that is too difficult makes you stop, and one that is too easy gives almost no progress. You need a balance."),
 			new GeneratedQuestion(
-					"Что такое collocations в тексте?",
-					List.of("Слова, которые обычно употребляются вместе",
-							"Слова, которые редко используются",
-							"Слова, заученные по списку",
-							"Слова без перевода на русский"),
-					"Слова, которые обычно употребляются вместе",
-					"Пример «make a decision» вместо «do a decision» показывает, что в английском есть устойчивые сочетания слов."),
+					"What are collocations according to the text?",
+					List.of("Words that usually go together",
+							"Words that are rarely used",
+							"Words learnt from a list",
+							"Words without a translation into Russian"),
+					"Words that usually go together",
+					"The example \"make a decision\" instead of \"do a decision\" shows that English has fixed word combinations."),
 			new GeneratedQuestion(
-					"Какой способ изучения слов автор считает менее надёжным?",
-					List.of("Чтение текстов",
-							"Запоминание списков слов",
-							"Чтение с догадкой по контексту",
-							"Пересказ прочитанного своими словами"),
-					"Запоминание списков слов",
-					"Слова из списка не имеют контекста и забываются быстрее, чем слова из живого текста."),
+					"Which way of learning words does the author consider less reliable?",
+					List.of("Reading texts",
+							"Memorising word lists",
+							"Guessing words from context",
+							"Retelling what you read in your own words"),
+					"Memorising word lists",
+					"Words from a list have no context and are forgotten faster than words met in a real text."),
 			new GeneratedQuestion(
-					"Почему автор предлагает угадывать значение слова по контексту?",
-					List.of("Чтобы не открывать словарь вообще",
-							"Чтобы читать быстрее",
-							"Чтобы научиться понимать текст напрямую, без постоянного перевода",
-							"Чтобы запомнить перевод"),
-					"Чтобы научиться понимать текст напрямую, без постоянного перевода",
-					"Такая тренировка развивает навык чтения, при котором смысл воспринимается сразу, без дословного перевода."),
+					"Why does the author suggest guessing the meaning of a word from the context?",
+					List.of("So that you never open a dictionary",
+							"To read faster",
+							"To learn to understand the text directly, without constant translation",
+							"To remember the translation"),
+					"To learn to understand the text directly, without constant translation",
+					"This exercise trains reading in which the meaning is understood at once, without word-for-word translation."),
 			new GeneratedQuestion(
-					"Что автор считает важнее: объём чтения или его регулярность?",
-					List.of("Регулярность",
-							"Объём за один подход",
-							"Скорость чтения",
-							"Выбор сложных текстов"),
-					"Регулярность",
-					"Прямо сказано: постоянство важнее интенсивности, 15 минут в день лучше трёх часов раз в месяц."));
+					"What does the author think is more important: the amount of reading or how regular it is?",
+					List.of("Regularity",
+							"The amount in one sitting",
+							"Reading speed",
+							"Choosing difficult texts"),
+					"Regularity",
+					"The text says clearly: consistency beats intensity; fifteen minutes a day beats three hours once a month."));
 
 	@Override
 	public List<TopicProposal> generateTopics(Profile profile) {
@@ -117,13 +117,13 @@ public class StubAiGateway implements AiGateway {
 	@Override
 	public ReviewData generateReview(LearningSession session) {
 		return new ReviewData(
-				"Вы прочитали текст о том, почему ежедневное чтение эффективнее разовых занятий.",
-				"Разговор держался темы текста, вы отвечали по содержанию.",
-				"Стоит шире практиковать устойчивые сочетания слов и реже переводить прочитанное дословно.",
+				"You read a text about why daily reading is more effective than one-off study sessions.",
+				"The conversation stayed on the topic of the text and you answered in full sentences.",
+				"It is worth practising common word combinations more and translating what you read less.",
 				session.getLevel(),
-				List.of("Читать по 15 минут каждый день",
-						"Отмечать в тексте интересные сочетания слов",
-						"Сначала догадываться о значении, потом проверять"));
+				List.of("Read for fifteen minutes every day",
+						"Note interesting word combinations in the text",
+						"Guess the meaning first and only then check it"));
 	}
 
 }

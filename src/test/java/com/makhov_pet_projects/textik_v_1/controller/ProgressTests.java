@@ -120,7 +120,7 @@ class ProgressTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Расскажите о себе")));
+		.andExpect(content().string(containsString("Tell us about yourself")));
 
 		assertThat(profiles.findById(user.getId()).orElseThrow().getAbout()).isEqualTo("Люблю IT и спорт");
 	}
@@ -140,7 +140,7 @@ class ProgressTests extends WebTest {
 		//Assert
 		.andExpect(status().isOk())
 		.andExpect(content().string(containsString("Отпуск в Англии")))
-		.andExpect(content().string(not(containsString("Здесь появятся ваши сессии"))));
+		.andExpect(content().string(not(containsString("Your sessions will appear here"))));
 	}
 
 }

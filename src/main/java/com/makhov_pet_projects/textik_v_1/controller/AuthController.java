@@ -50,7 +50,7 @@ public class AuthController {
 		try {
 			registered = registration.register(form.email(), form.username(), form.password());
 		} catch (EmailAlreadyTakenException e) {
-			binding.rejectValue("email", "registration.emailTaken", "Такой email уже зарегистрирован");
+			binding.rejectValue("email", "registration.emailTaken", "This email is already registered");
 			return "register";
 		}
 		logIn(registered.getEmail(), request, response);

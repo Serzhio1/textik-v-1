@@ -6,27 +6,27 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record RegistrationForm(
-		@NotBlank(message = "Укажите email")
-		@Email(message = "Некорректный email")
-		@Size(max = 255, message = "Слишком длинный email")
+		@NotBlank(message = "Enter your email")
+		@Email(message = "Invalid email address")
+		@Size(max = 255, message = "Email is too long")
 		String email,
 
-		@NotBlank(message = "Укажите имя")
-		@Size(max = 255, message = "Слишком длинное имя")
+		@NotBlank(message = "Enter your name")
+		@Size(max = 255, message = "Name is too long")
 		String username,
 
-		@NotBlank(message = "Укажите пароль")
-		@Size(min = 8, max = 72, message = "Пароль должен быть от 8 до 72 символов")
+		@NotBlank(message = "Enter a password")
+		@Size(min = 8, max = 72, message = "Password must be between 8 and 72 characters")
 		String password,
 
-		@NotBlank(message = "Повторите пароль")
+		@NotBlank(message = "Repeat your password")
 		String passwordConfirm) {
 
 	public static RegistrationForm empty() {
 		return new RegistrationForm("", "", "", "");
 	}
 
-	@AssertTrue(message = "Пароли не совпадают")
+	@AssertTrue(message = "Passwords do not match")
 	public boolean isPasswordConfirmed() {
 		return password == null || password.isEmpty() || password.equals(passwordConfirm);
 	}

@@ -114,7 +114,7 @@ class OnboardingTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Расскажите о себе")));
+		.andExpect(content().string(containsString("Tell us about yourself")));
 
 		assertThat(profiles.findById(user.getId())).isEmpty();
 	}
@@ -135,7 +135,7 @@ class OnboardingTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Выберите уровень A1, A2 или B1")));
+		.andExpect(content().string(containsString("Choose level A1, A2 or B1")));
 
 		assertThat(profiles.findById(user.getId())).isEmpty();
 	}

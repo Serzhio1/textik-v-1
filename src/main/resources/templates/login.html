@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="ru" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments :: head('Вход')}"></head>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Sign in')}"></head>
 <body>
 <main class="card">
-	<h1>Вход</h1>
+	<h1>Sign in</h1>
 
-	<p class="notice error" th:if="${param.error}">Неверный email или пароль</p>
-	<p class="notice ok" th:if="${param.logout}">Вы вышли из аккаунта</p>
+	<p class="notice error" th:if="${param.error}">Invalid email or password</p>
+	<p class="notice ok" th:if="${param.logout}">You have been signed out</p>
 
 	<form th:action="@{/login}" action="/login" method="post" novalidate>
 		<label for="email">Email</label>
 		<input id="email" type="email" name="email" autocomplete="email" autofocus>
 
-		<label for="password">Пароль</label>
+		<label for="password">Password</label>
 		<input id="password" type="password" name="password" autocomplete="current-password">
 
-		<button type="submit">Войти</button>
+		<button type="submit">Sign in</button>
 	</form>
 
-	<p class="hint">Нет аккаунта? <a th:href="@{/register}" href="/register">Зарегистрироваться</a></p>
+	<p class="hint">No account? <a th:href="@{/register}" href="/register">Create one</a></p>
 </main>
 </body>
 </html>

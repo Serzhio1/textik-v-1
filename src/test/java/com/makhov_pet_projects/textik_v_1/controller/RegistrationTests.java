@@ -95,7 +95,7 @@ class RegistrationTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Такой email уже зарегистрирован")));
+		.andExpect(content().string(containsString("This email is already registered")));
 	}
 
 	@Test
@@ -110,7 +110,7 @@ class RegistrationTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Некорректный email")));
+		.andExpect(content().string(containsString("Invalid email address")));
 	}
 
 	@Test
@@ -125,7 +125,7 @@ class RegistrationTests extends WebTest {
 
 		//Assert
 		.andExpect(status().isOk())
-		.andExpect(content().string(containsString("Пароли не совпадают")));
+		.andExpect(content().string(containsString("Passwords do not match")));
 	}
 
 }
