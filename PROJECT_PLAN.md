@@ -104,8 +104,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
   `thymeleaf-extras-springsecurity6` (версию держит Boot parent), `spring-boot-starter-liquibase`
   + `liquibase-core`,
   `postgresql` (runtime), **Spring AI 2.0.1** (BOM + `spring-ai-starter-model-openai`),
-  `docker-compose`, Lombok, тест-стартеры (`spring-boot-starter-webmvc-test`,
-  `spring-security-test`, `spring-boot-testcontainers`, `testcontainers-postgresql`).
+  `docker-compose`, Lombok, тест-стартеры (`spring-boot-starter-thymeleaf-test`,
+  `spring-boot-starter-webmvc-test`, `spring-boot-starter-data-jpa-test`, `spring-security-test`,
+  `spring-boot-testcontainers`, `testcontainers-postgresql`).
 - `compose.yaml`: Postgres 17-alpine, БД/пользователь/пароль `textik`, том, healthcheck, порт **5433**.
 - `application.yaml`: datasource (env с дефолтами), `ddl-auto: validate`, `open-in-view: false`,
   Liquibase на `classpath:db/changelog/db.changelog-master.yaml`, плейсхолдеры
@@ -151,7 +152,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 | `exceptions/EmailAlreadyTakenException` | Бизнес-ошибка «email уже занят» |
 | `dto/RegistrationForm` | record: email, имя, пароль 8..72 символов + подтверждение (верхняя граница — лимит BCrypt в 72 байта) |
 | `controller/AuthController` | `GET /register`, `POST /register`, `GET /login`; внедрение зависимостей — Lombok `@RequiredArgsConstructor` |
-| `controller/HomeController` | `GET /` — временный главный экран («Привет, <имя>!»), на Этапе 6 дорастёт |
+| `controller/HomeController` | `GET /` — главный экран: имя пользователя и 4 плашки этапов (3.9) |
 | `resources/templates` | `fragments.html`, `onboarding.html`, `progress.html`, `register.html`, `login.html`, `home.html` + `static/css/app.css` |
 
 Поведение: **email = логин** (`.usernameParameter("email")`, 5.1); после регистрации —
@@ -196,7 +197,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 |------|--------|------|
 | `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `continueDiscussion`, `generateReview` |
 | `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
-| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~400 слов, 5 вопросов, реплики по ходу разговора, итоги |
+| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~350 слов, 5 вопросов, реплики по ходу разговора, итоги |
 | `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
 | `service` | `GigaChatTokenService` | Обмен `Authorization key` на `access_token` (30 минут): кэш, обновление за минуту до истечения, один обмен под конкуренцией; ключ и токен не логируются |
 | `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | Records structured output |
@@ -258,7 +259,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
   (`@SpringBootTest` + контейнер + профиль `test`), `WebTest` (`+ @AutoConfigureMockMvc`),
   `PostgresTestConfiguration` (контейнер как Spring-бин), `TestFixtures` (фабрики данных:
   `user`, `userWithPassword`, `userWithProfile`, `session`), `FakeChatModel` (`@UtilityClass`:
-  `answeringWith`, `recording`, `failing`).
+  `answeringWith`, `answeringWithSequence`, `recording`, `failing`).
 - Требования к тестам — 6.1–6.4.
 - MockMvc-тесты авторизуются через `user(AppUserDetails.of(user))`: с `user(...)` из
   `spring-security-test` в контексте лежит чужой principal, и интерсептор профиль не увидит.
@@ -280,9 +281,13 @@ saved»; выход → `/login?logout`, после него `/` снова 302 
 любым — это данные пользователя, а не тексты интерфейса).
 CSRF-токен после входа перевыпускается (5.1).
 
-Слой ИИ на живом приложении **не проверялся**: ключа и выбранной модели нет (5, раздел 5).
-Проверено автоматическими тестами: разбор JSON, отказоустойчивость, оба режима wiring (3.6).
-Живой вызов с настоящим ключом — первая задача Этапа 10 (README с переменными окружения).
+Слой ИИ проверен на живом приложении с настоящим ключом GigaChat: после установки
+сертификатов, выбора `AI_BASE_URL=https://api.giga.chat/v1` и модели из `GET /v1/models`
+запросы проходят; перехватчик `chatCompletionIdCustomizer` и санитайзер `ChatCompletionJson`
+чинят недо-стандартный ответ (20, 21). Автоматические тесты дополнительно проверяют разбор
+JSON, отказоустойчивость и оба режима wiring (3.6). На Этап 10 остаётся живой прогон всех
+пяти методов `AiGateway`; README с переменными окружения уже есть, его нужно дополнить
+инструкцией по получению ключа.
 
 ### 3.8 Чего ещё нет
 
@@ -340,7 +345,7 @@ CSRF-токен после входа перевыпускается (5.1).
 - [x] Прогресс: профиль + история сессий (`SessionService.findHistory`, пустое состояние;
       данные появятся на Этапах 6–9).
 - [x] Общие фрагменты `head`/`nav` — дублирования разметки больше нет.
-- [x] Проверка: 12 новых тестов MockMvc + ручная проверка живого приложения (3.4, 3.6, 3.7).
+- [x] Проверка: 13 новых тестов MockMvc + ручная проверка живого приложения (3.4, 3.6, 3.7).
 
 ### Этап 5. Слой ИИ (AiGateway) — выполнен
 - [x] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
@@ -360,8 +365,9 @@ CSRF-токен после входа перевыпускается (5.1).
 - [x] **GigaChat как провайдер по умолчанию:** `GigaChatTokenService` (обмен `Authorization key`
       на `access_token`, кэш, обновление за минуту до истечения, один обмен под конкуренцией) +
       `GigaChatClientConfig` (перехватчик заголовка авторизации). Модель по умолчанию `GigaChat-2`.
-- [x] Проверка: 40 тестов слоя ИИ и конфигурации, сеть не используется; полный цикл офлайн
-      проверяется на Этапах 6–9. Живой вызов с настоящим ключом — Этап 10.
+- [x] Проверка: 46 тестов слоя ИИ и конфигурации, сеть не используется; полный цикл офлайн
+      проверяется на Этапах 6–9. Живой вызов с настоящим ключом GigaChat проверен (3.7, 5);
+      живой прогон всех пяти методов — Этап 10.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
 - [x] Home: название приложения, 4 плашки этапов с временем + «Начать сессию».
@@ -463,9 +469,9 @@ CSRF-токен после входа перевыпускается (5.1).
   `ChatModel`, и `@ConditionalOnMissingBean` у автоконфигурации сверяется с типом
   `OpenAiChatModel` — бин типа `ChatModel` не вытеснил бы штатный и появились бы два клиента.
 - **`AiGateway` лежит в плоском пакете `service`**, без вложенности `service/ai` (6.8): фича
-  одна, роль одна. Из этого следует документированное исключение из правила «`service` не знает
-  про `dto`» — шлюз обменивается records-ами `dto`. Обратной зависимости нет: `dto` не знает
-  про `service`.
+  одна, роль одна. `service` знает про `dto` не только через шлюз: `ProfileService` принимает
+  `ProfileForm`, `SessionService` — `GeneratedText`/`GeneratedQuestion`. Обратной зависимости
+  нет: `dto` не знает про `service`.
 - **`continueDiscussion` и `generateReview` принимают `LearningSession`** и читают её
   `chatMessages` и `questions` (LAZY, при `open-in-view: false`). Вызывающий код обязан быть
   `@Transactional`, иначе `LazyInitializationException`. Если понадобится вызывать вне
@@ -623,10 +629,13 @@ CSRF-токен после входа перевыпускается (5.1).
 5. Разработчик **обязан** удалять комментарии, которые стали неактуальны, вместе с правкой кода:
    устаревший комментарий хуже отсутствующего.
 
-Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — четыре пояснения
-«почему» (`spring.ai.openai.*`, `app.ai.provider`, `app.ai.fallback`,
-`app.ai.gigachat.auth-key`) и одно в `application-test.yaml` (почему файл называется не
-`application.yaml`); в тестах — только `//Arrange //Act //Assert`.
+Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — 10 строк
+комментариев «почему» (4 темы: `spring.ai.openai.*`, `app.ai.provider`, `app.ai.fallback`,
+`app.ai.gigachat.auth-key`); в `application-test.yaml` — одна двухстрочная пояснительная
+запись (почему файл называется не `application.yaml`); в тестах — `//Arrange //Act //Assert`,
+кроме одного пояснения в `GigaChatClientConfigTests` (нарушение правила, удалить при следующей
+правке). В 17 тестах размечен пустой `//Arrange`, в 8 — пустой `//Act`: правило 6.1 требует
+не размечать пустые этапы.
 
 ### 6.6 Служебные классы: `@UtilityClass`
 
@@ -638,7 +647,8 @@ CSRF-токен после входа перевыпускается (5.1).
 - Ключевое слово `static` руками **не пишем** — Lombok делает члены статическими сам
   (проверено `javap`: в байт-коде они всё равно `public static`).
 - Применено к `support/TestFixtures`, `support/FakeChatModel`, `utility/Interests`,
-  `utility/AiPrompts`; Lombok подключён и для `default-testCompile`
+  `utility/AiPrompts`, `utility/Initials`, `utility/ChatCompletionIds`,
+  `utility/ChatCompletionJson`; Lombok подключён и для `default-testCompile`
   (`maven-compiler-plugin`, `annotationProcessorPaths`).
 - `@Component`-классы, `@TestConfiguration` и базовые тест-классы (`PostgresRepositoryTest`,
   `PostgresTestConfiguration`, `WebTest`) аннотацию не получают: им нужен Spring или
@@ -651,13 +661,16 @@ CSRF-токен после входа перевыпускается (5.1).
 легко забыть обновить при добавлении зависимости, и он пересказывает то, что уже выражает
 аннотация (то же, что 6.5 и 6.6).
 
-- Проверено по всему проекту: `private final`-поля есть у `controller/AuthController`
-  (4 зависимости), `service/UserRegistrationService` (2), `service/SpringAiGateway` (1),
-  `service/FallbackAiGateway` (2) — все на `@RequiredArgsConstructor`. Lombok подключён и для
-  main, и для test.
+- Проверено по всему проекту: `private final`-поля есть у 11 классов — `controller/AuthController`
+  (4 зависимости), `controller/OnboardingController` (1), `controller/ProfileController` (2),
+  `controller/SessionController` (3), `service/UserRegistrationService` (2), `service/ProfileService`
+  (1), `service/SessionService` (2), `service/SpringAiGateway` (1), `service/FallbackAiGateway` (2),
+  `security/OnboardingInterceptor` (1), `config/WebConfig` (1) — все на `@RequiredArgsConstructor`.
+  Lombok подключён и для main, и для test.
 - Исключения: JPA-сущности (поля не могут быть `final`, конструктор — часть доменного API),
   `EmailAlreadyTakenException` (считает строку и зовёт `super(...)`), классы без полей
-  (`HomeController`, `SecurityConfig`), тесты (зависимости внедряются полями `@Autowired`).
+  (`HomeController`, `SecurityConfig`), тесты (зависимости внедряются полями `@Autowired`),
+  `service/GigaChatTokenService` (ручные конструкторы из-за дополнительного `Clock` для тестов).
 - Проверка перед коммитом: `grep -rn "this\.[a-zA-Z]* = " src/main/java` — если в найденных
   конструкторах идёт только присваивание `final`-полей, конструктор лишний.
 
@@ -672,13 +685,13 @@ CSRF-токен после входа перевыпускается (5.1).
 | `entity` | 6 JPA-сущностей: `AppUser`, `Profile`, `LearningSession`, `Question`, `ChatMessage`, `SessionReview` | Spring-сервисов, HTTP |
 | `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления маппятся `@Enumerated`) |
 | `repository` | 6 интерфейсов Spring Data JPA | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
-| `service` | `UserRegistrationService`, `ProfileService`, `SessionService`, `AiGateway` + `SpringAiGateway`, `StubAiGateway`, `FallbackAiGateway` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
+| `service` | `UserRegistrationService`, `ProfileService`, `SessionService`, `GigaChatTokenService`, `AiGateway` + `SpringAiGateway`, `StubAiGateway`, `FallbackAiGateway` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
 | `dto` | `RegistrationForm`, `ProfileForm`, records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
 | `exceptions` | `EmailAlreadyTakenException`, `AiGatewayException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
-| `controller` | `AuthController`, `HomeController`, `OnboardingController`, `ProfileController` | Бизнес-логики, `@Entity`, прямого `Repository` |
-| `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`), `AiGatewayConfig`, `AiProperties` | Контроллеров, сервисов, сущностей |
+| `controller` | `AuthController`, `HomeController`, `OnboardingController`, `ProfileController`, `SessionController` | Бизнес-логики, `@Entity`, прямого `Repository` |
+| `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`), `AiGatewayConfig`, `AiProperties`, `GigaChatClientConfig`, `GigaChatProperties` | Контроллеров, сервисов, сущностей |
 | `security` | `AppUserDetails`, `OnboardingInterceptor` | `@Configuration` — это уже `config` |
-| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests`, `AiPrompts` | `@Component`, `@Service`, состояния |
+| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests`, `AiPrompts`, `Initials`, `ChatCompletionIds`, `ChatCompletionJson` | `@Component`, `@Service`, состояния |
 
 Направления зависимостей (единственные разрешённые):
 
@@ -690,9 +703,11 @@ controller → service → repository → entity
 ```
 
 - `controller` знает `service`, `dto`, `security` (кто вошёл) и `config` (Spring сам);
-  `service` **не знает** про `controller`. `dto` в знает только `AiGateway`: обмен records-ами
-  structured output — сознательное исключение, обоснованное в 5.1.
-- `service` знает `dto` (только `AiGateway`), `entity`, `exceptions`, `utility`, `enums`
+  `service` **не знает** про `controller`. `service` знает `dto` шире, чем только `AiGateway`:
+  `ProfileService` принимает `ProfileForm`, `SessionService` — `GeneratedText` и
+  `GeneratedQuestion`; обмен records-ами structured output через `AiGateway` — сознательное
+  исключение, обоснованное в 5.1.
+- `service` знает `dto` (включая формы и records ИИ), `entity`, `exceptions`, `utility`, `enums`
   и Spring AI — но не HTTP. Именно поэтому `AiGateway` отделяет ИИ от остального приложения.
 - `security` знает `service` и `entity`: `OnboardingInterceptor` спрашивает `ProfileService`,
   есть ли профиль. Исключение из «`security` — лист», обоснованное в 5.1.
