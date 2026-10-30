@@ -51,6 +51,35 @@ class LearningSessionTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что метод startThinking переводит чтение к вопросам")
+	void startThinkingMovesReadToThink() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+
+		//Act
+		session.startThinking();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.THINK);
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что повторный startThinking не двигает сессию дальше")
+	void startThinkingKeepsThinkStatus() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+		session.startThinking();
+
+		//Act
+		session.startThinking();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.THINK);
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что добавленный вопрос попадает в коллекцию вопросов сессии")
 	void addsQuestionToSession() {
 		//Arrange

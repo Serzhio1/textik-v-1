@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
 import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
 import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import jakarta.persistence.Table;
@@ -65,6 +66,7 @@ public class LearningSession {
 	private String textContent;
 
 	@OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OrderBy("id ASC")
 	@ToString.Exclude
 	private List<Question> questions = new ArrayList<>();
 
@@ -85,6 +87,12 @@ public class LearningSession {
 
 	public void advance() {
 		this.status = this.status.next();
+	}
+
+	public void startThinking() {
+		if (status == SessionStatus.READ) {
+			advance();
+		}
 	}
 
 	public void addQuestion(String prompt, List<String> options, String correctAnswer, String explanation) {

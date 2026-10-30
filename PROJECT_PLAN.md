@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 134 тестов, ~35 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 145 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -18,9 +18,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - **Стек:** Java 21, Spring Boot **4.1.1**, Spring Security 7, Spring Data JPA, Thymeleaf,
   Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент), Postgres 17, Lombok.
 - **Структура кода:** 10 плоских пакетов, таблица и направления зависимостей — **6.8**.
-- **Сделано:** Этапы 0–6 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
-  создание сессии + чтение) — **3.1–3.9**.
-- **Следующий этап:** 7 — вопросы (Think) — **4**.
+- **Сделано:** Этапы 0–7 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
+  создание сессии + чтение + вопросы) — **3.1–3.10**.
+- **Следующий этап:** 8 — обсуждение (Discuss) — **4**.
 - **Правила и запреты:** 6 (комментарии, Lombok, тесты) и 5.1 (не трогать changeset-файлы,
   не заводить `src/test/resources/application.yaml`).
 - **Ключ ИИ не нужен для разработки:** профиль `local` подставляет заглушку (5.1).
@@ -243,15 +243,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 134, `./mvnw test` зелёные (~35 с)
+### 3.6 Тесты — 145, `./mvnw test` зелёные (~40 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
-| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 7 | 16 |
+| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 9 | 18 |
 | Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6 | 15 |
 | Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 12, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 27 |
-| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 6, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 27 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6 | 29 |
+| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 7, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 28 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8 | 37 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
@@ -291,7 +291,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 
 ### 3.8 Чего ещё нет
 
-- Вопросы (Этап 7), обсуждение (8), ревью (9). Слой ИИ к ним готов, «К вопросам» пока — кнопка-заглушка.
+- Обсуждение (8), ревью (9). Слой ИИ к ним готов.
 - Восстановление пароля, аватар с загрузкой, статистика между сессиями — вне скоупа MVP.
 
 ### 3.9 Создание сессии, выбор темы, чтение (Этап 6, выполнен)
@@ -314,9 +314,34 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   302 на `/select?error=1` с уведомлением «We could not prepare the materials. Please try
   again later» (22).
 - **Чтение.** `/sessions/{id}/read` — проверка владельца через `findForOwner` (чужая → 404),
-  на странице название, описание, текст, кнопка «Questions — next stage» (пока отключена — Этап 7).
+  на странице название, описание, текст, кнопка «Go to questions» ведёт на `/sessions/{id}/think`.
 - Проверка фиксируется `ReadingFlowTests`: выбор темы, сохранение сессии, страница чтения,
   чужая сессия → 404, сбой генерации, неверный номер темы.
+
+### 3.10 Вопросы (Этап 7, выполнен)
+
+| Слой | Классы | Роль |
+|------|--------|------|
+| `controller` | `SessionController` | `GET /sessions/{id}/think`, `POST /sessions/{id}/think` |
+| `service` | `SessionService` | `startThinking` (сессия с вопросами + `READ → THINK`), `answerQuestions` |
+| `repository` | `SessionRepository` | `findWithQuestionsByIdAndUserId` — сессия с вопросами только для владельца |
+| `entity` | `LearningSession` | `startThinking` — идемпотентный переход `READ → THINK` |
+| Шаблоны | `think.html`, `read.html` | все вопросы на одной странице; результаты и счёт; ссылка с чтения |
+
+Поведение:
+
+- **Страница вопросов.** `GET /think` загружает сессию вместе с вопросами, первый визит переводит
+  её в `THINK`; чужая или отсутствующая сессия → 404. Все вопросы показываются на одной странице
+  одной формой.
+- **Проверка ответов.** `POST /think` принимает ответы на все вопросы; если хотя бы один ответ
+  не выбран или не входит в варианты, ничего не сохраняется и происходит редирект на
+  `/think?error=1`. Успешная отправка сохраняет все ответы и возвращает на `/think`.
+- **Результаты.** После отправки у каждого вопроса видны ответ пользователя, правильный ответ,
+  объяснение и отметка «Correct/Incorrect». Внизу — счёт правильных/неправильных ответов и
+  отключённая кнопка «To discussion» (включится на Этапе 8).
+- **Повторная отправка.** Завершённая страница вопросов не перезаписывает уже сохранённые ответы.
+- Проверка фиксируется `ThinkFlowTests` (8), плюс юнит-тесты `LearningSessionTests` (2) и
+  `SessionRepositoryTests` (1).
 
 ---
 
@@ -375,16 +400,18 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       «Начать чтение»). Три предложения хранятся в HTTP-сессии: `sessions.proposals` в БД нет,
       обновление страницы перегенерирует их (осознанный MVP-трейдофф, 5.1).
 - [x] Выбор темы → генерация полного текста → `read.html` (название, описание, текст,
-      «К вопросам» — заглушка). Вопросы генерируются сразу вместе с текстом (18).
+      «Go to questions» ведёт к вопросам, Этап 7). Вопросы генерируются сразу вместе с текстом (18).
 - [x] Экраны подключают `head`/`nav` из `fragments.html` (Этап 4), вопрос про layout закрыт (5).
 - [x] Проверка: «Начать сессию» → 3 темы → читаем текст. Сбой генерации → `/select?error=1`.
       Проверка владельца сессии уже на чтении (чужая → 404). Тесты — `ReadingFlowTests` (6).
 
-### Этап 7. Вопросы (Think)
-- [ ] Экран по одному вопросу из уже сгенерированных (Этап 6); после ответа — детерминированная
-      проверка (сравнение выбранного варианта с `correct_answer`).
-- [ ] При неверном ответе — объяснение. В конце — «К обсуждению».
-- [ ] Проверка: отвечаю на все вопросы, видны объяснения, ведётся счёт правильно/неправильно.
+### Этап 7. Вопросы (Think) — выполнен
+- [x] Все вопросы из уже сгенерированных (Этап 6) показываются на одной странице; ответы
+      отправляются одной формой, проверка детерминированная (сравнение с `correct_answer`).
+- [x] После отправки — объяснение, правильный ответ и отметка Correct/Incorrect по каждому вопросу;
+      внизу счёт правильно/неправильно и «К обсуждению» (заглушка до Этапа 8).
+- [x] Первый визит переводит сессию `READ → THINK`; повторная отправка не перезаписывает ответы.
+- [x] Проверка: `ThinkFlowTests` (8), `LearningSessionTests` (+2), `SessionRepositoryTests` (+1).
 
 ### Этап 8. Обсуждение (Discuss)
 - [ ] `discuss.html`: диалоговое окно (переписка из `chat_messages`), поле ввода.
@@ -632,10 +659,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 Сейчас: в `main`-коде Java комментариев нет вообще; в `application.yaml` — 10 строк
 комментариев «почему» (4 темы: `spring.ai.openai.*`, `app.ai.provider`, `app.ai.fallback`,
 `app.ai.gigachat.auth-key`); в `application-test.yaml` — одна двухстрочная пояснительная
-запись (почему файл называется не `application.yaml`); в тестах — `//Arrange //Act //Assert`,
-кроме одного пояснения в `GigaChatClientConfigTests` (нарушение правила, удалить при следующей
-правке). В 17 тестах размечен пустой `//Arrange`, в 8 — пустой `//Act`: правило 6.1 требует
-не размечать пустые этапы.
+запись (почему файл называется не `application.yaml`); в тестах — только `//Arrange //Act //Assert`,
+и только на непустых этапах.
 
 ### 6.6 Служебные классы: `@UtilityClass`
 

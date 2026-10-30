@@ -84,6 +84,26 @@ class SessionRepositoryTests extends PostgresRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что сессия загружается с вопросами только для владельца")
+	void findsSessionWithQuestionsForOwner() {
+		//Arrange
+		AppUser owner = TestFixtures.user(users);
+		AppUser stranger = TestFixtures.user(users);
+		LearningSession session = LearningSession.proposed(owner, "A1");
+		session.addQuestion("Pick one", List.of("a", "b", "c", "d"), "c", null);
+		sessions.saveAndFlush(session);
+
+		//Act
+		LearningSession found = sessions.findWithQuestionsByIdAndUserId(session.getId(), owner.getId()).orElseThrow();
+		boolean visibleToStranger = sessions.findWithQuestionsByIdAndUserId(session.getId(), stranger.getId())
+				.isPresent();
+
+		//Assert
+		assertThat(found.getQuestions()).hasSize(1);
+		assertThat(visibleToStranger).isFalse();
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что история пользователя отдаётся от свежих к старым")
 	void findsUserHistoryInReverseOrder() {
 		//Arrange

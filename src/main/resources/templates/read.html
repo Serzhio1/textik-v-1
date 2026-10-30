@@ -9,8 +9,8 @@
 	<p class="topic__desc" th:text="${learningSession.description}">Description</p>
 	<div class="reading" th:text="${learningSession.textContent}">Text</div>
 
-	<button type="button" class="button-disabled" disabled
-			title="Available in the next stage">Questions — next stage</button>
+	<a class="button-start button-start--spaced"
+	   th:href="@{/sessions/{id}/think(id=${learningSession.id})}" href="#">Go to questions</a>
 </main>
 </body>
 </html>

@@ -5,13 +5,16 @@ import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.TopicProposal;
 import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
 import com.makhov_pet_projects.textik_v_1.entity.Profile;
+import com.makhov_pet_projects.textik_v_1.entity.Question;
 import com.makhov_pet_projects.textik_v_1.exceptions.AiGatewayException;
 import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
 import com.makhov_pet_projects.textik_v_1.service.AiGateway;
 import com.makhov_pet_projects.textik_v_1.service.ProfileService;
 import com.makhov_pet_projects.textik_v_1.service.SessionService;
 import jakarta.servlet.http.HttpSession;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -68,6 +71,60 @@ public class SessionController {
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 		model.addAttribute("learningSession", session);
 		return "read";
+	}
+
+	@GetMapping("/sessions/{id}/think")
+	String think(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
+			@RequestParam(defaultValue = "false") boolean error, Model model) {
+		LearningSession session = sessions.startThinking(id, user.id())
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+		boolean summary = summary(session);
+		long correctCount = correctCount(session);
+		model.addAttribute("learningSession", session);
+		model.addAttribute("questions", session.getQuestions());
+		model.addAttribute("summary", summary);
+		model.addAttribute("correctCount", correctCount);
+		model.addAttribute("wrongCount", session.getQuestions().size() - correctCount);
+		model.addAttribute("error", error);
+		return "think";
+	}
+
+	@PostMapping("/sessions/{id}/think")
+	String answer(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
+			@RequestParam Map<String, String> params) {
+		LearningSession session = sessions.startThinking(id, user.id())
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+		if (summary(session)) {
+			return "redirect:/sessions/" + id + "/think";
+		}
+		Map<Long, String> answers = answers(session, params);
+		if (answers.size() != session.getQuestions().size()) {
+			return "redirect:/sessions/" + id + "/think?error=1";
+		}
+		sessions.answerQuestions(id, user.id(), answers);
+		return "redirect:/sessions/" + id + "/think";
+	}
+
+	private boolean summary(LearningSession session) {
+		return !session.getQuestions().isEmpty()
+				&& session.getQuestions().stream().allMatch(Question::isAnswered);
+	}
+
+	private long correctCount(LearningSession session) {
+		return session.getQuestions().stream()
+				.filter(question -> Boolean.TRUE.equals(question.getIsCorrect()))
+				.count();
+	}
+
+	private Map<Long, String> answers(LearningSession session, Map<String, String> params) {
+		Map<Long, String> answers = new HashMap<>();
+		session.getQuestions().forEach(question -> {
+			String answer = params.get("answer_" + question.getId());
+			if (answer != null && question.getOptions().contains(answer)) {
+				answers.put(question.getId(), answer);
+			}
+		});
+		return answers;
 	}
 
 	private List<TopicProposal> proposals(HttpSession httpSession) {

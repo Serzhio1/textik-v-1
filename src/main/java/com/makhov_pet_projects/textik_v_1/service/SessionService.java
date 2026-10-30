@@ -8,6 +8,7 @@ import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.SessionRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,19 @@ public class SessionService {
 	@Transactional(readOnly = true)
 	public Optional<LearningSession> findForOwner(Long sessionId, Long userId) {
 		return sessions.findByIdAndUserId(sessionId, userId);
+	}
+
+	@Transactional
+	public Optional<LearningSession> startThinking(Long sessionId, Long userId) {
+		Optional<LearningSession> found = sessions.findWithQuestionsByIdAndUserId(sessionId, userId);
+		found.ifPresent(LearningSession::startThinking);
+		return found;
+	}
+
+	@Transactional
+	public void answerQuestions(Long sessionId, Long userId, Map<Long, String> answers) {
+		LearningSession session = sessions.findWithQuestionsByIdAndUserId(sessionId, userId).orElseThrow();
+		session.getQuestions().forEach(question -> question.answer(answers.get(question.getId())));
 	}
 
 }

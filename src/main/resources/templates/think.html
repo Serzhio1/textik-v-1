@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Questions')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('home')}"></nav>
+
+<main class="card card--wide">
+	<h1 th:text="${learningSession.title}">Questions</h1>
+	<p class="hint-inline hint-inline--top" th:if="${!summary}">Choose one answer for each question.</p>
+	<p class="notice error" th:if="${error}">Please answer every question using one of the options.</p>
+
+	<form th:if="${!summary}" th:action="@{/sessions/{id}/think(id=${learningSession.id})}" action="#" method="post">
+		<div class="questions">
+			<section class="question" th:each="question, questionStat : ${questions}">
+				<h2 class="question__prompt">
+					<span th:text="${questionStat.count} + '. '">1. </span>
+					<span th:text="${question.prompt}">Question</span>
+				</h2>
+				<div class="options">
+					<label class="option" th:each="option : ${question.options}">
+						<input type="radio" th:name="|answer_${question.id}|" th:value="${option}">
+						<span th:text="${option}">Option</span>
+					</label>
+				</div>
+			</section>
+		</div>
+		<button type="submit">Check answers</button>
+	</form>
+
+	<div th:if="${summary}">
+		<div class="questions">
+			<section class="question" th:each="question, questionStat : ${questions}">
+				<h2 class="question__prompt">
+					<span th:text="${questionStat.count} + '. '">1. </span>
+					<span th:text="${question.prompt}">Question</span>
+				</h2>
+				<p class="question__answer">
+					Your answer: <strong th:text="${question.userAnswer}">Answer</strong>
+				</p>
+				<p class="question__answer">
+					Correct answer: <strong th:text="${question.correctAnswer}">Correct</strong>
+				</p>
+				<p class="question__result"
+				   th:classappend="${question.isCorrect} ? 'is-correct' : 'is-wrong'"
+				   th:text="${question.isCorrect} ? 'Correct' : 'Incorrect'">Correct</p>
+				<p class="question__explanation" th:if="${question.explanation}" th:text="${question.explanation}">Explanation</p>
+			</section>
+		</div>
+
+		<div class="score">
+			<p class="score__value"
+			   th:text="${correctCount} + ' / ' + ${#lists.size(questions)} + ' correct'">0 / 0 correct</p>
+			<p class="score__meta" th:text="${wrongCount} + ' wrong'">0 wrong</p>
+		</div>
+
+		<button type="button" class="button-disabled" disabled title="Available in the next stage">To discussion</button>
+	</div>
+</main>
+</body>
+</html>
