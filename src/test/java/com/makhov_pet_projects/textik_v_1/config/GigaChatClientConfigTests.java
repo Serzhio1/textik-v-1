@@ -34,7 +34,6 @@ class GigaChatClientConfigTests {
 	@Test
 	@DisplayName("Для GigaChat заводим сервис токена и перехватчики авторизации и id")
 	void registersTokenServiceAndInterceptors() {
-		//Arrange
 		//Act
 		runner.withPropertyValues("app.ai.provider=gigachat", "app.ai.gigachat.auth-key=key").run(context -> {
 			//Assert
@@ -51,7 +50,6 @@ class GigaChatClientConfigTests {
 	@Test
 	@DisplayName("Для остальных провайдеров перехватчик не добавляется")
 	void backsOffForOtherProviders() {
-		//Arrange
 		//Act
 		runner.withPropertyValues("app.ai.provider=openai", "app.ai.gigachat.auth-key=key").run(context -> {
 			//Assert
@@ -88,7 +86,6 @@ class GigaChatClientConfigTests {
 		SpringAiOpenAiHttpClient.Builder builder = SpringAiOpenAiHttpClient.builder();
 		customizer.customize(builder);
 		List<Interceptor> interceptors = builder.build().getOkHttpClient().interceptors();
-		// Наш перехватчик добавляется последним, перед ним — перехватчик наблюдений Micrometer.
 		return interceptors.get(interceptors.size() - 1);
 	}
 

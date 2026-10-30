@@ -62,7 +62,6 @@ class FallbackAiGatewayTests {
 		when(primary.generateTopics(profile)).thenThrow(new AiGatewayException("основная упала"));
 		when(backup.generateTopics(profile)).thenThrow(new AiGatewayException("резервная упала"));
 
-		//Act
 		//Assert
 		assertThatThrownBy(() -> new FallbackAiGateway(primary, backup).generateTopics(profile))
 				.isInstanceOf(AiGatewayException.class)

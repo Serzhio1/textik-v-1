@@ -136,7 +136,6 @@ class SpringAiGatewayTests {
 		//Arrange
 		SpringAiGateway gateway = gatewayAnswering("извините, я не смог");
 
-		//Act
 		//Assert
 		assertThatThrownBy(() -> gateway.generateTopics(profile))
 				.isInstanceOf(AiGatewayException.class)
@@ -149,7 +148,6 @@ class SpringAiGatewayTests {
 		//Arrange
 		SpringAiGateway gateway = new SpringAiGateway(ChatClient.builder(FakeChatModel.failing()));
 
-		//Act
 		//Assert
 		assertThatThrownBy(() -> gateway.generateTopics(profile))
 				.isInstanceOf(AiGatewayException.class)

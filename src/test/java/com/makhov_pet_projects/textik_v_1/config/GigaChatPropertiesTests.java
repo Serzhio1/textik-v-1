@@ -11,7 +11,6 @@ class GigaChatPropertiesTests {
 	@Test
 	@DisplayName("Адрес выдачи токена и scope берём из документов GigaChat")
 	void appliesDefaults() {
-		//Arrange
 		//Act
 		GigaChatProperties properties = new GigaChatProperties(null, null, null);
 
@@ -25,7 +24,6 @@ class GigaChatPropertiesTests {
 	@Test
 	@DisplayName("Пробелы вокруг ключа не мешают его увидеть")
 	void trimsAuthorizationKey() {
-		//Arrange
 		//Act
 		GigaChatProperties properties = new GigaChatProperties("  key  ", "  ", "");
 

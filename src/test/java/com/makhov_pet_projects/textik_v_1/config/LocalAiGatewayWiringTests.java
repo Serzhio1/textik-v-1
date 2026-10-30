@@ -20,8 +20,6 @@ class LocalAiGatewayWiringTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("Тест, в котором мы проверяем, что в профиле local подключается заглушка без обращения к сети")
 	void usesStubGatewayInLocalProfile() {
-		//Arrange
-		//Act
 		//Assert
 		assertThat(gateway).isInstanceOf(StubAiGateway.class);
 	}

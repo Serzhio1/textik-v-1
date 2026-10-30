@@ -18,8 +18,6 @@ class AiGatewayWiringTests extends PostgresIntegrationTest {
 	@Test
 	@DisplayName("Тест, в котором мы проверяем, что без профиля local подключается реализация на Spring AI")
 	void usesRemoteGatewayByDefault() {
-		//Arrange
-		//Act
 		//Assert
 		assertThat(gateway).isInstanceOf(SpringAiGateway.class);
 	}

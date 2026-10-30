@@ -23,7 +23,6 @@ class StubAiGatewayTests {
 	@Test
 	@DisplayName("Тест, в котором мы проверяем, что заглушка подбирает три темы")
 	void proposesThreeTopics() {
-		//Arrange
 		//Act
 		List<TopicProposal> topics = gateway.generateTopics(profile);
 

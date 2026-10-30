@@ -139,7 +139,6 @@ class GigaChatTokenServiceTests {
 		//Arrange
 		GigaChatTokenService service = service("   ");
 
-		//Act
 		//Assert
 		assertThatThrownBy(service::currentToken)
 				.isInstanceOf(AiGatewayException.class)
@@ -154,7 +153,6 @@ class GigaChatTokenServiceTests {
 		server.expect(requestTo(AUTH_URL)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 		GigaChatTokenService service = service(AUTH_KEY);
 
-		//Act
 		//Assert
 		assertThatThrownBy(service::currentToken).isInstanceOf(AiGatewayException.class);
 		server.verify();
@@ -167,7 +165,6 @@ class GigaChatTokenServiceTests {
 		server.expect(requestTo(AUTH_URL)).andRespond(withServerError());
 		GigaChatTokenService service = service(AUTH_KEY);
 
-		//Act
 		//Assert
 		assertThatThrownBy(service::currentToken)
 				.isInstanceOf(AiGatewayException.class)
