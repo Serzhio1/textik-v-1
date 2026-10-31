@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Review')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('home')}"></nav>
+
+<main class="card card--wide">
+	<h1>Well done!</h1>
+	<p class="hint-inline hint-inline--top">
+		You have completed the session. Here is what you achieved and what to focus on next.
+	</p>
+
+	<section class="review-block">
+		<h2 class="section-title">Reading</h2>
+		<p class="review-text" th:text="${review.textSummary}">Reading summary</p>
+	</section>
+
+	<section class="review-block">
+		<h2 class="section-title">Discussion</h2>
+		<p class="review-text" th:text="${review.conversationSummary}">Conversation summary</p>
+		<p class="meta">Speaking level: <span class="chip" th:text="${review.conversationGrade}">A2</span></p>
+	</section>
+
+	<div class="score">
+		<p class="score__value"
+		   th:text="${review.questionsCorrect} + ' / ' + ${review.questionsTotal} + ' correct'">4 / 5 correct</p>
+		<p class="score__meta"
+		   th:text="${review.questionsTotal - review.questionsCorrect} + ' wrong'">1 wrong</p>
+	</div>
+
+	<section class="review-block" th:if="${not #strings.isEmpty(review.mistakes)}">
+		<h2 class="section-title">Mistakes</h2>
+		<p class="review-text" th:text="${review.mistakes}">Mistakes</p>
+	</section>
+
+	<section class="review-block" th:if="${not #lists.isEmpty(review.mainErrorLines())}">
+		<h2 class="section-title">Focus next time</h2>
+		<ul class="review-errors">
+			<li th:each="error : ${review.mainErrorLines()}" th:text="${error}">Improvement</li>
+		</ul>
+	</section>
+
+	<a class="button-start button-start--spaced" th:href="@{/}" href="/">Back to home</a>
+</main>
+</body>
+</html>

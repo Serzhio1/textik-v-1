@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 8-add-session-review-main-errors
+      author: textik
+      comment: Store AI recommendations separately from detailed mistakes
+      changes:
+        - addColumn:
+            tableName: session_reviews
+            columns:
+              - column:
+                  name: main_errors
+                  type: TEXT

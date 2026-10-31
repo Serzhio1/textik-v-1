@@ -28,7 +28,8 @@ class SessionReviewRepositoryTests extends PostgresRepositoryTest {
 	void storesReviewForSession() {
 		//Arrange
 		LearningSession session = sessionWithTopic();
-		SessionReview review = SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки", "B1", 5, 4);
+		SessionReview review = SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки",
+				"Фокус на временах\nФокус на артиклях", "B1", 5, 4);
 
 		//Act
 		reviews.saveAndFlush(review);
@@ -43,7 +44,8 @@ class SessionReviewRepositoryTests extends PostgresRepositoryTest {
 		//Arrange
 		LearningSession session = sessionWithTopic();
 		reviews.saveAndFlush(
-				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки", "A2", 5, 4));
+				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки",
+						"Фокус на временах", "A2", 5, 4));
 
 		//Act
 		SessionReview stored = reviews.findBySessionId(session.getId()).orElseThrow();
@@ -58,7 +60,8 @@ class SessionReviewRepositoryTests extends PostgresRepositoryTest {
 		//Arrange
 		LearningSession session = sessionWithTopic();
 		reviews.saveAndFlush(
-				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки", "B1", 7, 5));
+				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки",
+						"Фокус на временах", "B1", 7, 5));
 
 		//Act
 		SessionReview stored = reviews.findBySessionId(session.getId()).orElseThrow();
@@ -74,13 +77,30 @@ class SessionReviewRepositoryTests extends PostgresRepositoryTest {
 		//Arrange
 		LearningSession session = sessionWithTopic();
 		reviews.saveAndFlush(
-				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки", "B1", 5, 4));
+				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки",
+						"Фокус на временах\nФокус на артиклях", "B1", 5, 4));
 
 		//Act
 		SessionReview stored = reviews.findBySessionId(session.getId()).orElseThrow();
 
 		//Assert
 		assertThat(stored.getCreatedAt()).isNotNull();
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что основные ошибки сохраняются и разбиваются на строки")
+	void storesMainErrors() {
+		//Arrange
+		LearningSession session = sessionWithTopic();
+		reviews.saveAndFlush(
+				SessionReview.of(session, "Резюме текста", "Резюме разговора", "Ошибки",
+						"Фокус на временах\n\nФокус на артиклях", "B1", 5, 4));
+
+		//Act
+		SessionReview stored = reviews.findBySessionId(session.getId()).orElseThrow();
+
+		//Assert
+		assertThat(stored.mainErrorLines()).containsExactly("Фокус на временах", "Фокус на артиклях");
 	}
 
 	private LearningSession sessionWithTopic() {

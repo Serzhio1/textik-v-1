@@ -307,6 +307,15 @@ button.link-button:hover {
 	border-bottom: 1px solid #eef0f5;
 }
 
+.history__title {
+	color: #1f2430;
+	text-decoration: none;
+}
+
+.history__title:hover {
+	color: #2f6fed;
+}
+
 .stages {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -563,4 +572,22 @@ button.link-button:hover {
 	margin: 4px 0 0;
 	color: #5a6270;
 	font-size: 14px;
+}
+
+.review-block {
+	margin: 24px 0 0;
+}
+
+.review-text {
+	margin: 0;
+	white-space: pre-wrap;
+}
+
+.review-errors {
+	margin: 0;
+	padding-left: 20px;
+}
+
+.review-errors li {
+	margin: 6px 0;
 }

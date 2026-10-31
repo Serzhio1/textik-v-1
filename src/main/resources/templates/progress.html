@@ -53,7 +53,8 @@
 		<div class="empty" th:if="${#lists.isEmpty(history)}">Your sessions will appear here</div>
 		<ul class="history" th:if="${not #lists.isEmpty(history)}">
 			<li class="history__item" th:each="past : ${history}">
-				<span th:text="${past.title}">Topic</span>
+				<a class="history__title" th:href="@{/sessions/{id}/review(id=${past.id})}"
+				   th:text="${past.title}">Topic</a>
 				<span class="chip" th:text="${past.status}">PROPOSED</span>
 			</li>
 		</ul>

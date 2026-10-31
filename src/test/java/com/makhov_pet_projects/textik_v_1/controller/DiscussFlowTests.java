@@ -250,7 +250,8 @@ class DiscussFlowTests extends WebTest {
 		//Assert
 		.andExpect(status().isOk())
 		.andExpect(content().string(containsString("You have finished the discussion.")))
-		.andExpect(content().string(containsString("button-disabled")));
+		.andExpect(content().string(containsString("Go to review")))
+		.andExpect(content().string(containsString("/sessions/" + session.getId() + "/review")));
 
 		assertThat(chatMessages.countBySessionIdAndRole(session.getId(), ChatRole.USER)).isEqualTo(3);
 	}

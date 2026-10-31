@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 182 теста, ~40 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 191 тест, ~45 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -18,9 +18,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - **Стек:** Java 21, Spring Boot **4.1.1**, Spring Security 7, Spring Data JPA, Thymeleaf,
   Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент), Postgres 17, Lombok.
 - **Структура кода:** 10 плоских пакетов, таблица и направления зависимостей — **6.8**.
-- **Сделано:** Этапы 0–8 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
-  создание сессии + чтение + вопросы + обсуждение) — **3.1–3.11**.
-- **Следующий этап:** 9 — ревью (Review) — **4**.
+- **Сделано:** Этапы 0–9 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
+  создание сессии + чтение + вопросы + обсуждение + ревью) — **3.1–3.12**.
+- **Следующий этап:** 10 — доводка и защита — **4**.
 - **Правила и запреты:** 6 (комментарии, Lombok, тесты) и 5.1 (не трогать changeset-файлы,
   не заводить `src/test/resources/application.yaml`).
 - **Ключ ИИ не нужен для разработки:** профиль `local` подставляет заглушку (5.1).
@@ -116,10 +116,11 @@ docker compose up -d            # Postgres 17, хост-порт 5433
   Комментарии в файле — только «почему».
 - `db/changelog/db.changelog-master.yaml` подключает `changesets/001-create-users`,
   `002-create-profiles`, `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
-  `006-create-session-reviews`, `007-add-chat-message-correction`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
+  `006-create-session-reviews`, `007-add-chat-message-correction`,
+  `008-add-session-review-main-errors`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
   `avatar_url`, `updated_at`, `display_name`, `created_at`/`finished_at` (sessions), `q_index`,
   `answered_at`, `q_type` (и его CHECK). Остались CHECK на `level`, `status`, `role`.
-  **Changeset-файлы 001–007 не редактируем** (сломается checksum) — только новые.
+  **Changeset-файлы 001–008 не редактируем** (сломается checksum) — только новые.
 - Приложение стартует ~8 с, Liquibase применяет миграции при старте.
 
 ### 3.2 Домен (Этап 2, выполнен)
@@ -138,6 +139,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
     ругается на расхождение `text` / `varchar(255)`; `chat_messages.correction` — nullable
     `text` для исправленной версии реплики ученика;
   - `session_reviews.created_at` — `Instant` (→ `timestamptz`), заполняется приложением;
+  - `session_reviews.main_errors` — nullable `text` для идей на следующий раз;
   - `Profile.userId` — assigned-id без ассоциации на `AppUser` (5.1, последний пункт).
 - `ddl-auto: validate` проходит: схема и сущности согласованы.
 
@@ -244,15 +246,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 182, `./mvnw test` зелёные (~40 с)
+### 3.6 Тесты — 191, `./mvnw test` зелёные (~45 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
-| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 12 | 21 |
+| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 14 | 23 |
 | Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6, `CorrectionGuardTests` 7 | 22 |
 | Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 19, `StubAiGatewayTests` 7, `FallbackAiGatewayTests` 6, `GigaChatTokenServiceTests` 7 | 39 |
-| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 8, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 5, `SessionReviewRepositoryTests` 4 | 30 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8, `DiscussFlowTests` 13 | 50 |
+| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 8, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 5, `SessionReviewRepositoryTests` 5 | 31 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8, `DiscussFlowTests` 13, `ReviewFlowTests` 6 | 56 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
@@ -292,8 +294,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 
 ### 3.8 Чего ещё нет
 
-- Ревью (9): генерация итогов, `review.html`, сохранение в `session_reviews`, `DISCUSS → DONE`.
-  Слой ИИ (`generateReview`) к нему готов.
+- Этап 10: живой прогон ИИ, загрузочные состояния, финальная доводка README.
 - Восстановление пароля, аватар с загрузкой, статистика между сессиями — вне скоупа MVP.
 
 ### 3.9 Создание сессии, выбор темы, чтение (Этап 6, выполнен)
@@ -378,8 +379,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   «Looks good — no changes needed». Исходный текст ученика не меняется и остаётся в истории
   и промпте ревью.
 - **Порог ревью.** После 3 реплик ученика (`REVIEW_AFTER_USER_TURNS = 3`) страница сообщает,
-  что обсуждение завершено, но кнопка «Go to review» остаётся отключённой до Этапа 9. Верхней
-  границы обмена нет — ученик может продолжать разговор.
+  что обсуждение завершено, и показывает ссылку «Go to review». Верхней границы обмена нет —
+  ученик может продолжать разговор.
 - **Ошибки ИИ.** Сбой стартового вопроса не роняет страницу: `tryOpenDiscussion` пишет
   предупреждение в лог, чат остаётся пустым, обновление страницы повторяет попытку. Сбой ответа
   откатывает транзакцию (ничего не сохраняется) и возвращает `/discuss?error=1` с английским
@@ -390,6 +391,37 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - Проверка фиксируется `DiscussFlowTests` (13), плюс `LearningSessionTests` (+3),
   `SessionRepositoryTests` (+1), `ChatMessageRepositoryTests` (+1), `CorrectionGuardTests` (7),
   `SpringAiGatewayTests` (19), `StubAiGatewayTests` (7), `FallbackAiGatewayTests` (6).
+
+### 3.12 Ревью (Этап 9, выполнен)
+
+| Слой | Классы | Роль |
+|------|--------|------|
+| `controller` | `SessionController` | `GET /sessions/{id}/review`, флаг `reviewError` на Discuss |
+| `service` | `SessionService` | `openReview` — идемпотентная генерация, подсчёт, сохранение, `DISCUSS → DONE` |
+| `repository` | `SessionRepository` | `findWithReviewByIdAndUserId` — сессия с сохранённым ревью только для владельца |
+| `entity` | `LearningSession`, `SessionReview` | `finishReview`; `mainErrors` и `mainErrorLines()` в ревью |
+| `dto` | `ReviewData` | Structured output: резюме, ошибки, оценка разговора, идеи на следующий раз |
+| `utility` | `AiPrompts` | `REVIEW_*`; `mistakes` — допущенные ошибки, `mainErrors` — рекомендации без повторов |
+| Шаблоны | `review.html`, `discuss.html`, `progress.html` | Итоги, ссылка после 3 реплик, заголовки истории ведут в ревью |
+
+Поведение:
+
+- **Первый заход.** `GET /review` доступен из `DISCUSS` после 3 реплик ученика. Сервис считает
+  правильные ответы по `Question.isCorrect()` (без ответа — неверный), просит `generateReview`,
+  сохраняет `session_reviews`, переводит сессию в `DONE`. Оценка разговора валидируется по
+  уровням профиля, при невалидном значении берётся уровень сессии; `mainErrors` нормализуется
+  в nullable `text`.
+- **Повторный заход.** Сохранённое ревью отдаётся без вызова ИИ; страница доступна и для `DONE`,
+  и для `DISCUSS`, если ревью уже есть. Ранний заход из `READ`/`THINK` → редирект на текущий
+  этап, чужая или отсутствующая сессия → 404.
+- **Сбой ИИ.** Транзакция откатывается, сессия остаётся в `DISCUSS`, ничего не сохраняется,
+  `/discuss?reviewError=1` показывает английское сообщение и позволяет повторить.
+- **Интерфейс.** Поздравление, оба резюме, счёт `correct/total`, оценка разговора, блок
+  «Mistakes» и «Focus next time»; кнопка на главный экран. В истории «Прогресса» название
+  завершённой сессии ведёт на её ревью.
+- **Миграция.** `session_reviews.main_errors TEXT` (changeset `008-add-session-review-main-errors`).
+- Проверка фиксируется `ReviewFlowTests` (6), `SessionReviewRepositoryTests` (+1),
+  `LearningSessionTests` (+2); общий прогон — **191 тест**, 0 падений.
 
 ---
 
@@ -469,8 +501,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       сохраняется в `chat_messages`.
 - [x] Отправка → `continueDiscussion` (ответ) и `correctUserMessage` (отдельное исправление);
       под репликой ученика справа показывается исправленный вариант или подтверждение, что всё
-      корректно. После 3 реплик ученика страница сообщает о завершении обсуждения, но
-      «Go to review» остаётся отключённой до Этапа 9.
+      корректно. После 3 реплик ученика страница сообщает о завершении обсуждения и
+      показывает ссылку «Go to review» (Этап 9).
 - [x] Исправление хранится в `chat_messages.correction` (changeset `007`) и не заменяет исходную
       реплику ученика. `CorrectionGuard` отбрасывает неправдоподобные ответы модели.
 - [x] Сбой ИИ не теряет данные: стартовый вопрос повторяется при обновлении, сбой ответа
@@ -481,14 +513,17 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       `StubAiGatewayTests` (7), `FallbackAiGatewayTests` (6). Возврат к теме при уходе — поведение
       модели, живая проверка на Этапе 10.
 
-### Этап 9. Ревью (Review)
-- [ ] `generateReview()`: резюме, число ошибок в тестах, оценка уровня разговора, разбор
-      основных ошибок.
-- [ ] `review.html`: поздравление + результаты + «На главный экран».
-- [ ] Сохранение в `session_reviews`, статус сессии → DONE, попадание в историю.
-- [ ] «Прогресс» показывает реальную историю сессий (сортировка по `id` — дат у сессий нет,
-      5.1).
-- [ ] Проверка: полный круг Read→Think→Discuss→Review, итоги в истории.
+### Этап 9. Ревью (Review) — выполнен
+- [x] `generateReview()`: резюме, число ошибок в тестах, оценка уровня разговора, разбор
+      основных ошибок. Счёт вопросов — в коде, не в модели; `mistakes` и `mainErrors`
+      разделены.
+- [x] `review.html`: поздравление + результаты + «На главный экран».
+- [x] Сохранение в `session_reviews`, статус сессии → DONE, попадание в историю; повторный
+      заход отдаёт сохранённое ревью без нового вызова ИИ.
+- [x] «Прогресс» показывает реальную историю сессий (сортировка по `id` — дат у сессий нет,
+      5.1), заголовок ведёт на ревью.
+- [x] Проверка: полный круг Read→Think→Discuss→Review, итоги в истории;
+      `ReviewFlowTests` (6), `SessionReviewRepositoryTests` (+1), `LearningSessionTests` (+2).
 
 ### Этап 10. Доводка и защита
 - [ ] Проверка владельца сессии на всех `/sessions/{id}/...` (чужая → 404/403).
@@ -567,8 +602,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   транзакции — переходить на `fetch = EAGER` или на отдельные запросы.
 - **Порог ревью — 3 реплики ученика, без верхней границы.** Считаются только сообщения с ролью
   `USER`; стартовый вопрос ИИ не в счёт. Порог задан константой
-  `SessionService.REVIEW_AFTER_USER_TURNS`; на Этапе 8 кнопка «Go to review» остаётся
-  отключённой, активация — на Этапе 9.
+  `SessionService.REVIEW_AFTER_USER_TURNS`; после порога ссылка «Go to review» активна.
 - **Стартовый вопрос — отдельный метод `openDiscussion`, а не `continueDiscussion` с пустой
   репликой.** Он генерируется только когда переписка пуста; при сбое статус уже `DISCUSS`,
   поэтому обновление страницы повторяет попытку, а не зацикливает редирект.
@@ -597,8 +631,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   знать: **любая ошибка компиляции в одном классе «ломает» Lombok во всём модуле** — annotation
   processing не доходит до конца, и в ошибках появляются фантомные «cannot find symbol: getRole()»
   на сгенерированных Lombok-методах. Настоящая первая ошибка — в начале списка.
-- **Changeset-файлы 001–007 не трогаем** — иначе сломается checksum. Новые изменения — новыми
-  файлами (следующий свободный номер — 008).
+- **Changeset-файлы 001–008 не трогаем** — иначе сломается checksum. Новые изменения — новыми
+  файлами (следующий свободный номер — 009).
 - **`src/test/resources/application.yaml` заводить нельзя** — одноимённый файл затеняет
   `src/main/resources/application.yaml`, в тестах пропадают `spring.ai.openai.*`, и контекст падает
   с «At least one credential source must be specified». Тестовые настройки — только
@@ -637,14 +671,14 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   токен на каждый запрос), Thymeleaf подставляет скрытое поле `_csrf` сам.
 - **Схема упрощена под MVP:** `sessions.proposals` нет (темы хранятся в HTTP-сессии),
   `sessions.created_at`/`finished_at` нет (история сортируется по `id`; нужны даты — changeset
-  008 `ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`), `q_type` нет (все вопросы
+  009 `ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`), `q_type` нет (все вопросы
   single-choice), `users.display_name` нет (роль играет `username`).
 - **`Profile` не связан ассоциацией с `AppUser`:** `profiles.user_id` — общий PK (PK = FK на
   `users.id`), что несовместимо со Spring Data JPA («must be manually assigned before persist()»
   и «This class does not define an IdClass»). **Решено:** `user_id` — assigned-id
   (`Long userId`), профиль берётся из `profileRepository.findById(currentUserId)`, каскада нет
   (удаление профиля делает `ON DELETE CASCADE` в БД). Понадобится `user.getProfile()` — changeset
-  008 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
+  009 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
 - **Проверка «профиль заполнен» живёт в MVC-слое, а не в `SecurityConfig`:** `HandlerInterceptor`
   вызывается после фильтров, поэтому анонимного пользователя до него не доходит, а
   `Authentication` уже в `SecurityContext` — principal доступен без запроса к БД. Проверка

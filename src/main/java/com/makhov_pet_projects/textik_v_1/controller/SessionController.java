@@ -108,14 +108,35 @@ public class SessionController {
 
 	@GetMapping("/sessions/{id}/discuss")
 	String discuss(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
-			@RequestParam(defaultValue = "false") boolean error, Model model) {
+			@RequestParam(defaultValue = "false") boolean error,
+			@RequestParam(defaultValue = "false") boolean reviewError, Model model) {
 		LearningSession session = sessions.startDiscussion(id, user.id())
 				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 		if (session.getStatus() == SessionStatus.READ) {
 			return "redirect:/sessions/" + id + "/think";
 		}
-		addDiscussionAttributes(session, error, model);
+		addDiscussionAttributes(session, error, reviewError, model);
 		return "discuss";
+	}
+
+	@GetMapping("/sessions/{id}/review")
+	String review(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user, Model model) {
+		try {
+			LearningSession session = sessions.openReview(id, user.id())
+					.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+			if (session.getStatus() == SessionStatus.READ) {
+				return "redirect:/sessions/" + id + "/think";
+			}
+			if (session.getStatus() != SessionStatus.DONE || session.getReview() == null) {
+				return "redirect:/sessions/" + id + "/discuss";
+			}
+			model.addAttribute("learningSession", session);
+			model.addAttribute("review", session.getReview());
+			return "review";
+		} catch (AiGatewayException e) {
+			log.warn("Не удалось подвести итоги сессии {}", id, e);
+			return "redirect:/sessions/" + id + "/discuss?reviewError=1";
+		}
 	}
 
 	@PostMapping("/sessions/{id}/discuss")
@@ -138,13 +159,14 @@ public class SessionController {
 		}
 	}
 
-	private void addDiscussionAttributes(LearningSession session, boolean error, Model model) {
+	private void addDiscussionAttributes(LearningSession session, boolean error, boolean reviewError, Model model) {
 		long turns = session.userTurns();
 		model.addAttribute("learningSession", session);
 		model.addAttribute("messages", session.getChatMessages());
 		model.addAttribute("userTurns", turns);
 		model.addAttribute("messagesLeft", Math.max(0L, SessionService.REVIEW_AFTER_USER_TURNS - turns));
 		model.addAttribute("error", error || session.getChatMessages().isEmpty());
+		model.addAttribute("reviewError", reviewError);
 	}
 
 	private boolean summary(LearningSession session) {

@@ -20,3 +20,6 @@ databaseChangeLog:
   - include:
       file: changesets/007-add-chat-message-correction.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changesets/008-add-session-review-main-errors.yaml
+      relativeToChangelogFile: true

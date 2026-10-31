@@ -25,6 +25,10 @@ public interface SessionRepository extends JpaRepository<LearningSession, Long> 
 	@Query("select s from LearningSession s where s.id = :id and s.user.id = :userId")
 	Optional<LearningSession> findWithChatMessagesByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
+	@EntityGraph(attributePaths = "review")
+	@Query("select s from LearningSession s where s.id = :id and s.user.id = :userId")
+	Optional<LearningSession> findWithReviewByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
 	long countByUserIdAndStatus(Long userId, SessionStatus status);
 
 }

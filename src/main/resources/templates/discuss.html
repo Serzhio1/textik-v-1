@@ -8,6 +8,7 @@
 	<h1 th:text="${learningSession.title}">Discussion</h1>
 	<p class="topic__desc" th:text="${learningSession.description}">Description</p>
 	<p class="notice error" th:if="${error}">The AI could not reply. Please try again.</p>
+	<p class="notice error" th:if="${reviewError}">The AI could not prepare your review. Please try again.</p>
 
 	<div class="chat" th:if="${not #lists.isEmpty(messages)}">
 		<div class="chat__message" th:each="message : ${messages}"
@@ -32,10 +33,12 @@
 	<p class="hint-inline hint-inline--top" th:if="${messagesLeft > 0}"
 	   th:text="|Send ${messagesLeft} more message(s) to finish the discussion.|">Send 3 more message(s) to finish the discussion.</p>
 	<p class="hint-inline hint-inline--top" th:if="${messagesLeft == 0}">
-		You have finished the discussion. The review will be available in the next stage.
+		You have finished the discussion. Your review is ready.
 	</p>
 
-	<button type="button" class="button-disabled" disabled title="Available in the next stage">Go to review</button>
+	<a class="button-start button-start--spaced" th:if="${messagesLeft == 0}"
+	   th:href="@{/sessions/{id}/review(id=${learningSession.id})}">Go to review</a>
+	<button type="button" class="button-disabled" th:if="${messagesLeft > 0}" disabled>Go to review</button>
 </main>
 </body>
 </html>

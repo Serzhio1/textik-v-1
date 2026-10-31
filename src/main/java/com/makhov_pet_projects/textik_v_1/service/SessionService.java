@@ -2,14 +2,19 @@ package com.makhov_pet_projects.textik_v_1.service;
 
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
+import com.makhov_pet_projects.textik_v_1.dto.ProfileForm;
+import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
 import com.makhov_pet_projects.textik_v_1.entity.AppUser;
 import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
+import com.makhov_pet_projects.textik_v_1.entity.SessionReview;
 import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import com.makhov_pet_projects.textik_v_1.exceptions.AiGatewayException;
 import com.makhov_pet_projects.textik_v_1.repository.AppUserRepository;
 import com.makhov_pet_projects.textik_v_1.repository.SessionRepository;
+import com.makhov_pet_projects.textik_v_1.repository.SessionReviewRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +29,7 @@ public class SessionService {
 	public static final long REVIEW_AFTER_USER_TURNS = 3;
 
 	private final SessionRepository sessions;
+	private final SessionReviewRepository reviews;
 	private final AppUserRepository users;
 	private final AiGateway ai;
 
@@ -88,6 +94,58 @@ public class SessionService {
 	public void answerQuestions(Long sessionId, Long userId, Map<Long, String> answers) {
 		LearningSession session = sessions.findWithQuestionsByIdAndUserId(sessionId, userId).orElseThrow();
 		session.getQuestions().forEach(question -> question.answer(answers.get(question.getId())));
+	}
+
+	@Transactional
+	public Optional<LearningSession> openReview(Long sessionId, Long userId) {
+		Optional<LearningSession> found = sessions.findWithQuestionsByIdAndUserId(sessionId, userId);
+		if (found.isEmpty()) {
+			return Optional.empty();
+		}
+		LearningSession session = found.get();
+		if (session.getStatus() == SessionStatus.DISCUSS && session.getReview() != null) {
+			session.finishReview();
+		}
+		if (session.getStatus() == SessionStatus.DISCUSS
+				&& session.userTurns() >= REVIEW_AFTER_USER_TURNS
+				&& session.getReview() == null) {
+			saveReview(session, ai.generateReview(session));
+		}
+		return sessions.findWithReviewByIdAndUserId(sessionId, userId);
+	}
+
+	private void saveReview(LearningSession session, ReviewData data) {
+		long correct = session.getQuestions().stream()
+				.filter(question -> Boolean.TRUE.equals(question.getIsCorrect()))
+				.count();
+		SessionReview review = SessionReview.of(session,
+				data.textSummary(),
+				data.conversationSummary(),
+				data.mistakes(),
+				mainErrors(data),
+				conversationGrade(data, session),
+				session.getQuestions().size(),
+				(int) correct);
+		session.setReview(review);
+		reviews.save(review);
+		session.finishReview();
+	}
+
+	private String mainErrors(ReviewData data) {
+		if (data.mainErrors() == null) {
+			return "";
+		}
+		return data.mainErrors().stream()
+				.filter(Objects::nonNull)
+				.map(String::trim)
+				.filter(line -> !line.isEmpty())
+				.reduce((first, second) -> first + "\n" + second)
+				.orElse("");
+	}
+
+	private String conversationGrade(ReviewData data, LearningSession session) {
+		String grade = data.conversationGrade() == null ? "" : data.conversationGrade().trim();
+		return ProfileForm.LEVELS.contains(grade) ? grade : session.getLevel();
 	}
 
 	private String correctionFor(LearningSession session, String message) {

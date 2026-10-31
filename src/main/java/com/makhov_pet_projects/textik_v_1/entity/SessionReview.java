@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -46,6 +47,9 @@ public class SessionReview {
 	@Column(name = "mistakes", columnDefinition = "text")
 	private String mistakes;
 
+	@Column(name = "main_errors", columnDefinition = "text")
+	private String mainErrors;
+
 	@Column(name = "conversation_grade", length = 2)
 	private String conversationGrade;
 
@@ -59,16 +63,28 @@ public class SessionReview {
 	private Instant createdAt = Instant.now();
 
 	public static SessionReview of(LearningSession session, String textSummary, String conversationSummary,
-			String mistakes, String conversationGrade, int questionsTotal, int questionsCorrect) {
+			String mistakes, String mainErrors, String conversationGrade, int questionsTotal,
+			int questionsCorrect) {
 		SessionReview review = new SessionReview();
 		review.setSession(session);
 		review.setTextSummary(textSummary);
 		review.setConversationSummary(conversationSummary);
 		review.setMistakes(mistakes);
+		review.setMainErrors(mainErrors);
 		review.setConversationGrade(conversationGrade);
 		review.setQuestionsTotal(questionsTotal);
 		review.setQuestionsCorrect(questionsCorrect);
 		return review;
+	}
+
+	public List<String> mainErrorLines() {
+		if (mainErrors == null || mainErrors.isBlank()) {
+			return List.of();
+		}
+		return mainErrors.lines()
+				.map(String::trim)
+				.filter(line -> !line.isEmpty())
+				.toList();
 	}
 
 }

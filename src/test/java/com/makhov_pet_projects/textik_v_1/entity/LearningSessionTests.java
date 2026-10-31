@@ -111,6 +111,39 @@ class LearningSessionTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что finishReview переводит обсуждение в завершённый статус")
+	void finishReviewMovesDiscussToDone() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+		session.startThinking();
+		session.startDiscussing();
+
+		//Act
+		session.finishReview();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.DONE);
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что повторный finishReview не меняет завершённый статус")
+	void finishReviewKeepsDoneStatus() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+		session.startThinking();
+		session.startDiscussing();
+		session.finishReview();
+
+		//Act
+		session.finishReview();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.DONE);
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что добавленный вопрос попадает в коллекцию вопросов сессии")
 	void addsQuestionToSession() {
 		//Arrange

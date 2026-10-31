@@ -102,6 +102,12 @@ public class LearningSession {
 		}
 	}
 
+	public void finishReview() {
+		if (status == SessionStatus.DISCUSS) {
+			advance();
+		}
+	}
+
 	public void addQuestion(String prompt, List<String> options, String correctAnswer, String explanation) {
 		questions.add(Question.singleChoice(this, prompt, options, correctAnswer, explanation));
 	}
