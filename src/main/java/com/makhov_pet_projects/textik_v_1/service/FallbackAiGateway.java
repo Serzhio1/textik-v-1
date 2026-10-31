@@ -1,6 +1,5 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -53,11 +52,19 @@ public class FallbackAiGateway implements AiGateway {
 	}
 
 	@Override
-	public DiscussionTurn continueDiscussion(LearningSession session, String userMessage) {
+	public String continueDiscussion(LearningSession session, String userMessage) {
 		return withFallback(
 				() -> primary.continueDiscussion(session, userMessage),
 				() -> fallback.continueDiscussion(session, userMessage),
 				"не удалось продолжить обсуждение");
+	}
+
+	@Override
+	public String correctUserMessage(LearningSession session, String userMessage) {
+		return withFallback(
+				() -> primary.correctUserMessage(session, userMessage),
+				() -> fallback.correctUserMessage(session, userMessage),
+				"не удалось получить исправление");
 	}
 
 	@Override

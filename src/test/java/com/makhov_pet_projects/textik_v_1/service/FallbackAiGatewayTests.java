@@ -6,7 +6,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.TopicProposal;
 import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
 import com.makhov_pet_projects.textik_v_1.entity.Profile;
@@ -79,17 +78,35 @@ class FallbackAiGatewayTests {
 		AiGateway primary = mock(AiGateway.class);
 		AiGateway backup = mock(AiGateway.class);
 		LearningSession session = mock(LearningSession.class);
-		DiscussionTurn turn = new DiscussionTurn("Good point.", "I have a question.");
 		when(primary.continueDiscussion(session, "I has a question."))
 				.thenThrow(new AiGatewayException("основная упала"));
-		when(backup.continueDiscussion(session, "I has a question.")).thenReturn(turn);
+		when(backup.continueDiscussion(session, "I has a question.")).thenReturn("Good point.");
 
 		//Act
-		DiscussionTurn result = new FallbackAiGateway(primary, backup)
+		String result = new FallbackAiGateway(primary, backup)
 				.continueDiscussion(session, "I has a question.");
 
 		//Assert
-		assertThat(result).isEqualTo(turn);
+		assertThat(result).isEqualTo("Good point.");
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что исправление переключается на резервную модель")
+	void correctsMessageWithFallback() {
+		//Arrange
+		AiGateway primary = mock(AiGateway.class);
+		AiGateway backup = mock(AiGateway.class);
+		LearningSession session = mock(LearningSession.class);
+		when(primary.correctUserMessage(session, "I has a question."))
+				.thenThrow(new AiGatewayException("основная упала"));
+		when(backup.correctUserMessage(session, "I has a question.")).thenReturn("I have a question.");
+
+		//Act
+		String result = new FallbackAiGateway(primary, backup)
+				.correctUserMessage(session, "I has a question.");
+
+		//Assert
+		assertThat(result).isEqualTo("I have a question.");
 	}
 
 	@Test

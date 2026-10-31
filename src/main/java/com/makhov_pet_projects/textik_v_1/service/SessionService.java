@@ -1,6 +1,5 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.entity.AppUser;
@@ -78,9 +77,9 @@ public class SessionService {
 		return sessions.findWithChatMessagesByIdAndUserId(sessionId, userId)
 				.filter(session -> session.getStatus() == SessionStatus.DISCUSS)
 				.map(session -> {
-					DiscussionTurn turn = ai.continueDiscussion(session, message);
-					session.addUserMessage(message, turn.correction());
-					session.addAssistantMessage(turn.reply());
+					String reply = ai.continueDiscussion(session, message);
+					session.addUserMessage(message, correctionFor(session, message));
+					session.addAssistantMessage(reply);
 					return session;
 				});
 	}
@@ -89,6 +88,15 @@ public class SessionService {
 	public void answerQuestions(Long sessionId, Long userId, Map<Long, String> answers) {
 		LearningSession session = sessions.findWithQuestionsByIdAndUserId(sessionId, userId).orElseThrow();
 		session.getQuestions().forEach(question -> question.answer(answers.get(question.getId())));
+	}
+
+	private String correctionFor(LearningSession session, String message) {
+		try {
+			return ai.correctUserMessage(session, message);
+		} catch (AiGatewayException e) {
+			log.warn("Не удалось получить исправление для сессии {}", session.getId(), e);
+			return null;
+		}
 	}
 
 	private void tryOpenDiscussion(LearningSession session) {

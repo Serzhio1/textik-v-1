@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 168 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 182 теста, ~40 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -196,14 +196,14 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 
 | Слой | Классы | Роль |
 |------|--------|------|
-| `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion`, `continueDiscussion`, `generateReview` |
+| `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion`, `continueDiscussion`, `correctUserMessage`, `generateReview` |
 | `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
 | `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~350 слов, 5 вопросов, стартовый вопрос и реплики по ходу разговора, итоги |
 | `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
 | `service` | `GigaChatTokenService` | Обмен `Authorization key` на `access_token` (30 минут): кэш, обновление за минуту до истечения, один обмен под конкуренцией; ключ и токен не логируются |
-| `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `DiscussionTurn`, `ReviewData` | Records structured output |
+| `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `LearnerCorrection`, `ReviewData` | Records structured output |
 | `exceptions` | `AiGatewayException` | Единая ошибка слоя ИИ (endpoint, пустой ответ, неразбираемый JSON) |
-| `utility` | `AiPrompts` | 6 промптов (темы, текст, вопросы, стартовый вопрос обсуждения, обсуждение, ревью) как `@UtilityClass`-константы |
+| `utility` | `AiPrompts` | 7 промптов (темы, текст, вопросы, стартовый вопрос обсуждения, обсуждение, исправление, ревью) как `@UtilityClass`-константы |
 | `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` или `app.ai.provider=stub` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
 | `config` | `GigaChatClientConfig`, `GigaChatProperties` | При `app.ai.provider=gigachat`: клиент выдачи токена, перехватчик `Authorization` → `Bearer <access_token>` и перехватчик, добавляющий `id` в ответ `chat.completions` (20) |
 
@@ -244,15 +244,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 168, `./mvnw test` зелёные (~40 с)
+### 3.6 Тесты — 182, `./mvnw test` зелёные (~40 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
 | Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 12 | 21 |
-| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6 | 15 |
-| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 14, `StubAiGatewayTests` 7, `FallbackAiGatewayTests` 5, `GigaChatTokenServiceTests` 7 | 33 |
+| Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6, `CorrectionGuardTests` 7 | 22 |
+| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 19, `StubAiGatewayTests` 7, `FallbackAiGatewayTests` 6, `GigaChatTokenServiceTests` 7 | 39 |
 | Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 8, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 5, `SessionReviewRepositoryTests` 4 | 30 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8, `DiscussFlowTests` 12 | 49 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8, `DiscussFlowTests` 13 | 50 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
@@ -353,9 +353,10 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 | `service` | `SessionService` | `startDiscussion` (сессия с перепиской + `THINK → DISCUSS`), `sendMessage`, `tryOpenDiscussion` |
 | `repository` | `SessionRepository` | `findWithChatMessagesByIdAndUserId` — сессия с перепиской только для владельца (`@EntityGraph`) |
 | `entity` | `LearningSession`, `ChatMessage` | `startDiscussing` — идемпотентный переход `THINK → DISCUSS`; `chatMessages` упорядочены `@OrderBy("id ASC")`; `ChatMessage.correction` — исправленная версия реплики ученика |
-| `service` | `AiGateway` | `openDiscussion` — стартовый вопрос; `continueDiscussion` — `DiscussionTurn` (ответ + исправление) |
-| `dto` | `DiscussionTurn` | Structured output обсуждения: `reply` и `correction` |
-| `utility` | `AiPrompts` | `DISCUSSION_OPENING_USER` — промпт стартового вопроса; `DISCUSSION_*` — ответ и исправление реплики |
+| `service` | `AiGateway` | `openDiscussion` — стартовый вопрос; `continueDiscussion` — ответ; `correctUserMessage` — отдельное исправление реплики |
+| `dto` | `LearnerCorrection` | Structured output исправления: `correctedLearnerMessage` |
+| `utility` | `AiPrompts` | `DISCUSSION_OPENING_USER` — стартовый вопрос; `DISCUSSION_*` — ответ; `DISCUSSION_CORRECTION_*` — исправление реплики с контекстом последней реплики ИИ |
+| `utility` | `CorrectionGuard` | отбрасывает ответ-уточнение, лишние идеи и расширение «исправления», включая короткие ответы |
 | Шаблоны | `discuss.html`, `think.html` | переписка, поле ввода, счётчик реплик; ссылка с вопросов |
 
 Поведение:
@@ -363,26 +364,32 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - **Первый заход.** `GET /discuss` загружает сессию с перепиской, переводит `THINK → DISCUSS`
   и, если переписка пуста, просит ИИ стартовый вопрос и сохраняет его. Чужая или отсутствующая
   сессия → 404; сессия в `READ` → редирект на `/think`; в `DISCUSS`/`DONE` страница доступна.
-- **Ответ.** `POST /discuss` принимает непустую реплику, получает `DiscussionTurn` от ИИ,
+- **Ответ.** `POST /discuss` принимает непустую реплику, получает ответ через
+  `continueDiscussion`, затем отдельно запрашивает исправление через `correctUserMessage`,
   сохраняет обе реплики (`USER` с `correction`, затем `ASSISTANT` с `null`) и делает редирект
-  на `/discuss` (PRG). Ответ ИИ запрашивается **до** сохранения реплики ученика: промпт
-  `continueDiscussion` уже содержит её текст.
+  на `/discuss` (PRG). Оба запроса идут **до** сохранения реплики ученика: в промпт ответа
+  она уже входит, а промпт исправления получает её отдельным полем. Контекстом исправления
+  служит только последняя реплика ИИ (вопрос), чтобы не раздувать промпт и не уводить диалог.
 - **Исправление.** Под репликой ученика справа показывается исправленный вариант только этой
-  реплики (`Corrected` + текст). Если модель вернула пустой `correction`, выводится
-  «Looks good — no changes needed»; у старых сообщений и реплик ИИ `correction = null`, блок
-  не рендерится. Исходный текст ученика не меняется и остаётся в истории/промпте ревью.
+  реплики (`Corrected` + текст). `CorrectionGuard` отбрасывает ответ-уточнение, текст с новыми
+  идеями и расширение более чем в 1.75 раза, в том числе для коротких ответов; для реплик
+  от 3 токенов также отбрасывается потеря более половины исходного текста. Такое исправление
+  сохраняется как `null`, блок не рендерится. Пустой `correctedLearnerMessage` означает «ошибок нет» и показывает
+  «Looks good — no changes needed». Исходный текст ученика не меняется и остаётся в истории
+  и промпте ревью.
 - **Порог ревью.** После 3 реплик ученика (`REVIEW_AFTER_USER_TURNS = 3`) страница сообщает,
   что обсуждение завершено, но кнопка «Go to review» остаётся отключённой до Этапа 9. Верхней
   границы обмена нет — ученик может продолжать разговор.
 - **Ошибки ИИ.** Сбой стартового вопроса не роняет страницу: `tryOpenDiscussion` пишет
   предупреждение в лог, чат остаётся пустым, обновление страницы повторяет попытку. Сбой ответа
   откатывает транзакцию (ничего не сохраняется) и возвращает `/discuss?error=1` с английским
-  сообщением. Пустая реплика — тоже `?error=1`.
+  сообщением. Сбой исправления не отменяет ответ: реплики сохраняются, `correction = null`,
+  в лог уходит предупреждение. Пустая реплика — тоже `?error=1`.
 - **Миграция.** `chat_messages` и `SessionStatus.DISCUSS` уже были в схеме; для исправлений
   добавлен nullable `correction TEXT` (changeset `007-add-chat-message-correction`).
-- Проверка фиксируется `DiscussFlowTests` (12), плюс `LearningSessionTests` (+3),
-  `SessionRepositoryTests` (+1), `ChatMessageRepositoryTests` (+1), `SpringAiGatewayTests` (+2),
-  `StubAiGatewayTests` (+1), `FallbackAiGatewayTests` (+1).
+- Проверка фиксируется `DiscussFlowTests` (13), плюс `LearningSessionTests` (+3),
+  `SessionRepositoryTests` (+1), `ChatMessageRepositoryTests` (+1), `CorrectionGuardTests` (7),
+  `SpringAiGatewayTests` (19), `StubAiGatewayTests` (7), `FallbackAiGatewayTests` (6).
 
 ---
 
@@ -460,16 +467,18 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       оставшихся реплик до порога ревью.
 - [x] Первый заход `THINK → DISCUSS`, ИИ задаёт стартовый вопрос (`openDiscussion`), переписка
       сохраняется в `chat_messages`.
-- [x] Отправка → `DiscussionTurn` от ИИ (ответ + исправление); под репликой ученика справа
-      показывается исправленный вариант или подтверждение, что всё корректно. После 3 реплик
-      ученика страница сообщает о завершении обсуждения, но «Go to review» остаётся отключённой
-      до Этапа 9.
+- [x] Отправка → `continueDiscussion` (ответ) и `correctUserMessage` (отдельное исправление);
+      под репликой ученика справа показывается исправленный вариант или подтверждение, что всё
+      корректно. После 3 реплик ученика страница сообщает о завершении обсуждения, но
+      «Go to review» остаётся отключённой до Этапа 9.
 - [x] Исправление хранится в `chat_messages.correction` (changeset `007`) и не заменяет исходную
-      реплику ученика.
-- [x] Сбой ИИ не теряет данные: стартовый вопрос повторяется при обновлении, ответ на реплику
-      откатывается и показывает `/discuss?error=1`.
-- [x] Проверка: `DiscussFlowTests` (12), `LearningSessionTests` (+3), `SessionRepositoryTests` (+1),
-      `ChatMessageRepositoryTests` (+1), тесты слоя ИИ (+6). Возврат к теме при уходе — поведение
+      реплику ученика. `CorrectionGuard` отбрасывает неправдоподобные ответы модели.
+- [x] Сбой ИИ не теряет данные: стартовый вопрос повторяется при обновлении, сбой ответа
+      откатывается и показывает `/discuss?error=1`, сбой исправления сохраняет ответ без блока
+      исправления.
+- [x] Проверка: `DiscussFlowTests` (13), `LearningSessionTests` (+3), `SessionRepositoryTests` (+1),
+      `ChatMessageRepositoryTests` (+1), `CorrectionGuardTests` (7), `SpringAiGatewayTests` (19),
+      `StubAiGatewayTests` (7), `FallbackAiGatewayTests` (6). Возврат к теме при уходе — поведение
       модели, живая проверка на Этапе 10.
 
 ### Этап 9. Ревью (Review)
@@ -567,11 +576,16 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   содержит её текст; если сохранить первой, реплика попадёт в историю дважды. Порядок в
   `sendMessage`: вызов ИИ → сохранение `USER` → сохранение `ASSISTANT`; при сбое транзакция
   откатывает всё.
-- **Исправление реплики приходит тем же structured-вызовом.** `continueDiscussion` возвращает
-  `DiscussionTurn(reply, correction)`: второй запрос к модели не нужен, ответ и исправление
-  сохраняются атомарно. `correction` — только исправленное предложение без пояснений; пустая
-  строка означает «ошибок нет», `null` — блок не показывается (старые сообщения и реплики ИИ).
-  В историю и промпт ревью идёт исходный текст ученика, а не исправление.
+- **Ответ и исправление — два независимых вызова.** `continueDiscussion` возвращает только
+  ответ, `correctUserMessage` — `LearnerCorrection(correctedLearnerMessage)`. Один structured-вызов
+  с полем `correction` провоцировал модель писать туда уточнение или продолжение диалога вместо
+  правки. Отдельный промпт запрещает отвечать, добавлять идеи и задавать вопросы; в него передаётся
+  только последняя реплика ИИ как контекст вопроса, без всей переписки. `CorrectionGuard`
+  дополнительно отбрасывает ответ-уточнение, текст с новыми идеями и расширение более чем
+  в 1.75 раза, включая короткие ответы. Пустая строка означает «ошибок нет», `null` — блок не показывается (старые
+  сообщения, реплики ИИ, отклонённое или недоступное исправление). В историю и промпт ревью
+  идёт исходный текст ученика, а не исправление. Цена решения — второй запрос к модели на
+  каждую реплику.
 - **Переписка грузится вместе с сессией** через `findWithChatMessagesByIdAndUserId`
   (`@EntityGraph`): при `open-in-view: false` иначе будет `LazyInitializationException`.
   Порядок реплик гарантирует `@OrderBy("id ASC")` на `LearningSession.chatMessages`.

@@ -12,7 +12,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.entity.AppUser;
@@ -115,9 +114,8 @@ class DiscussFlowTests extends WebTest {
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
 		LearningSession session = sessionAtThink(user);
 		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
-		when(ai.continueDiscussion(any(), any()))
-				.thenReturn(new DiscussionTurn("Great answer. What else did you notice?",
-						"I really liked the part about habits."));
+		when(ai.continueDiscussion(any(), any())).thenReturn("Great answer. What else did you notice?");
+		when(ai.correctUserMessage(any(), any())).thenReturn("I really liked the part about habits.");
 		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
 				.andExpect(status().isOk());
 
@@ -149,9 +147,8 @@ class DiscussFlowTests extends WebTest {
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
 		LearningSession session = sessionAtThink(user);
 		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
-		when(ai.continueDiscussion(any(), any()))
-				.thenReturn(new DiscussionTurn("Great answer. What else did you notice?",
-						"I really liked the part about habits."));
+		when(ai.continueDiscussion(any(), any())).thenReturn("Great answer. What else did you notice?");
+		when(ai.correctUserMessage(any(), any())).thenReturn("I really liked the part about habits.");
 		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
 				.andExpect(status().isOk());
 		sendMessage(session, user, "I liked the part about habits.").andExpect(status().is3xxRedirection());
@@ -173,8 +170,8 @@ class DiscussFlowTests extends WebTest {
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
 		LearningSession session = sessionAtThink(user);
 		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
-		when(ai.continueDiscussion(any(), any()))
-				.thenReturn(new DiscussionTurn("Good point. What else?", ""));
+		when(ai.continueDiscussion(any(), any())).thenReturn("Good point. What else?");
+		when(ai.correctUserMessage(any(), any())).thenReturn("");
 		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
 				.andExpect(status().isOk());
 		sendMessage(session, user, "I liked the part about habits.").andExpect(status().is3xxRedirection());
@@ -220,7 +217,7 @@ class DiscussFlowTests extends WebTest {
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
 		LearningSession session = sessionAtThink(user);
 		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
-		when(ai.continueDiscussion(any(), any())).thenReturn(new DiscussionTurn("Good point. What else?", ""));
+		when(ai.continueDiscussion(any(), any())).thenReturn("Good point. What else?");
 		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
 				.andExpect(status().isOk());
 		sendMessage(session, user, "First thought").andExpect(status().is3xxRedirection());
@@ -240,7 +237,7 @@ class DiscussFlowTests extends WebTest {
 		AppUser user = TestFixtures.userWithProfile(users, profiles);
 		LearningSession session = sessionAtThink(user);
 		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
-		when(ai.continueDiscussion(any(), any())).thenReturn(new DiscussionTurn("Good point. What else?", ""));
+		when(ai.continueDiscussion(any(), any())).thenReturn("Good point. What else?");
 		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
 				.andExpect(status().isOk());
 		sendMessage(session, user, "First thought").andExpect(status().is3xxRedirection());
@@ -277,6 +274,33 @@ class DiscussFlowTests extends WebTest {
 		.andExpect(redirectedUrl("/sessions/" + session.getId() + "/discuss?error=1"));
 
 		assertThat(chatMessages.findBySessionIdOrderById(session.getId())).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что сбой исправления не отменяет сохранённый ответ")
+	void correctionFailureKeepsReplyWithoutCorrection() throws Exception {
+		//Arrange
+		AppUser user = TestFixtures.userWithProfile(users, profiles);
+		LearningSession session = sessionAtThink(user);
+		when(ai.openDiscussion(any())).thenReturn("What did you think about the text?");
+		when(ai.continueDiscussion(any(), any())).thenReturn("Good point. What else?");
+		when(ai.correctUserMessage(any(), any())).thenThrow(new AiGatewayException("редактор недоступен"));
+		mockMvc.perform(get("/sessions/{id}/discuss", session.getId()).with(user(AppUserDetails.of(user))))
+				.andExpect(status().isOk());
+
+		//Act
+		sendMessage(session, user, "I liked the part about habits.")
+
+		//Assert
+		.andExpect(status().is3xxRedirection())
+		.andExpect(redirectedUrl("/sessions/" + session.getId() + "/discuss"));
+
+		List<ChatMessage> messages = chatMessages.findBySessionIdOrderById(session.getId());
+		assertThat(messages).extracting(ChatMessage::getContent).containsExactly(
+				"What did you think about the text?",
+				"I liked the part about habits.",
+				"Good point. What else?");
+		assertThat(messages.get(1).getCorrection()).isNull();
 	}
 
 	@Test

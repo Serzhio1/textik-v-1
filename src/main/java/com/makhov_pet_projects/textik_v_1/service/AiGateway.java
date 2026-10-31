@@ -1,6 +1,5 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -19,7 +18,9 @@ public interface AiGateway {
 
 	String openDiscussion(LearningSession session);
 
-	DiscussionTurn continueDiscussion(LearningSession session, String userMessage);
+	String continueDiscussion(LearningSession session, String userMessage);
+
+	String correctUserMessage(LearningSession session, String userMessage);
 
 	ReviewData generateReview(LearningSession session);
 

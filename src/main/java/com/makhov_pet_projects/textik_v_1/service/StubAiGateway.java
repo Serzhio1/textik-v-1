@@ -1,6 +1,5 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -110,16 +109,19 @@ public class StubAiGateway implements AiGateway {
 	}
 
 	@Override
-	public DiscussionTurn continueDiscussion(LearningSession session, String userMessage) {
-		String reply = switch ((int) session.userTurns()) {
+	public String continueDiscussion(LearningSession session, String userMessage) {
+		return switch ((int) session.userTurns()) {
 			case 0 -> "Which part of the text did you find most useful?";
 			case 1 -> "Do you read in English regularly? What makes it easy or hard for you?";
 			case 2 -> "The author says consistency beats intensity. Do you agree?";
 			case 3 -> "How would you explain the main idea of the text to a friend?";
 			default -> "What habit from the text would you like to try this week?";
 		};
-		String correction = "I have tried watching videos on YouTube with subtitles.";
-		return new DiscussionTurn(reply, correction);
+	}
+
+	@Override
+	public String correctUserMessage(LearningSession session, String userMessage) {
+		return null;
 	}
 
 	@Override

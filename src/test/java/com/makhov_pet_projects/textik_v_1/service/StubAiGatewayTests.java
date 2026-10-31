@@ -2,7 +2,6 @@ package com.makhov_pet_projects.textik_v_1.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -82,23 +81,23 @@ class StubAiGatewayTests {
 		session.addUserMessage("Мне понравился первый абзац", null);
 
 		//Act
-		DiscussionTurn first = gateway.continueDiscussion(session, "Первый вопрос");
-		session.addAssistantMessage(first.reply());
+		String first = gateway.continueDiscussion(session, "Первый вопрос");
+		session.addAssistantMessage(first);
 		session.addUserMessage("Второй вопрос", null);
-		DiscussionTurn second = gateway.continueDiscussion(session, "Второй вопрос");
+		String second = gateway.continueDiscussion(session, "Второй вопрос");
 
 		//Assert
-		assertThat(first.reply()).isNotEqualTo(second.reply());
+		assertThat(first).isNotEqualTo(second);
 	}
 
 	@Test
-	@DisplayName("Тест, в котором мы проверяем, что заглушка возвращает исправленный вариант реплики")
-	void returnsUserCorrection() {
+	@DisplayName("Тест, в котором мы проверяем, что заглушка не придумывает исправление")
+	void doesNotInventCorrection() {
 		//Act
-		DiscussionTurn turn = gateway.continueDiscussion(session(), "I has a question");
+		String correction = gateway.correctUserMessage(session(), "I has a question");
 
 		//Assert
-		assertThat(turn.correction()).isNotBlank();
+		assertThat(correction).isNull();
 	}
 
 	@Test

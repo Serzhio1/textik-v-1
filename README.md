@@ -79,7 +79,9 @@ AI_PROVIDER=openai AI_API_KEY=sk-... AI_BASE_URL=https://api.openai.com AI_MODEL
 
 Вся работа с ИИ изолирована за интерфейсом `AiGateway` (`service/AiGateway.java`):
 `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion`, `continueDiscussion`,
-`generateReview`.
+`correctUserMessage`, `generateReview`. Ответ и исправление реплики запрашиваются отдельными
+вызовами; исправление получает последнюю реплику ИИ как контекст, а неправдоподобные
+исправления отбрасывает `CorrectionGuard`.
 Реализации: `SpringAiGateway` (боевая), `StubAiGateway` (офлайн), `FallbackAiGateway` (страховка).
 
 ## Состояние

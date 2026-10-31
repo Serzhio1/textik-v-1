@@ -1,8 +1,8 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
-import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
+import com.makhov_pet_projects.textik_v_1.dto.LearnerCorrection;
 import com.makhov_pet_projects.textik_v_1.dto.ProfileForm;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
 import com.makhov_pet_projects.textik_v_1.dto.TopicProposal;
@@ -14,6 +14,7 @@ import com.makhov_pet_projects.textik_v_1.enums.ChatRole;
 import com.makhov_pet_projects.textik_v_1.exceptions.AiGatewayException;
 import com.makhov_pet_projects.textik_v_1.utility.AiPrompts;
 import com.makhov_pet_projects.textik_v_1.utility.ChatCompletionJson;
+import com.makhov_pet_projects.textik_v_1.utility.CorrectionGuard;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -69,13 +70,29 @@ public class SpringAiGateway implements AiGateway {
 	}
 
 	@Override
-	public DiscussionTurn continueDiscussion(LearningSession session, String userMessage) {
-		StructuredOutputConverter<DiscussionTurn> converter = new BeanOutputConverter<>(DiscussionTurn.class);
+	public String continueDiscussion(LearningSession session, String userMessage) {
 		String user = String.format(AiPrompts.DISCUSSION_USER,
 				session.getTitle(), session.getDescription(), session.getLevel(),
 				session.getTextContent(), conversation(session), userMessage);
-		DiscussionTurn turn = askStructured(converter, AiPrompts.DISCUSSION_SYSTEM, user);
-		return new DiscussionTurn(trimmed(turn.reply()), trimmed(turn.correction()));
+		return ask(AiPrompts.DISCUSSION_SYSTEM, user).trim();
+	}
+
+	@Override
+	public String correctUserMessage(LearningSession session, String userMessage) {
+		StructuredOutputConverter<LearnerCorrection> converter =
+				new BeanOutputConverter<>(LearnerCorrection.class);
+		String user = String.format(AiPrompts.DISCUSSION_CORRECTION_USER,
+				session.getLevel(), lastAssistantMessage(session), userMessage);
+		LearnerCorrection result = askStructured(converter, AiPrompts.DISCUSSION_CORRECTION_SYSTEM, user);
+		String correction = result == null ? "" : trimmed(result.correctedLearnerMessage());
+		if (correction.isEmpty()) {
+			return "";
+		}
+		if (!CorrectionGuard.isPlausible(userMessage, correction)) {
+			log.warn("Отклоняю неправдоподобное исправление: {}", preview(correction));
+			return null;
+		}
+		return correction;
 	}
 
 	@Override
@@ -160,6 +177,14 @@ public class SpringAiGateway implements AiGateway {
 		return session.getChatMessages().stream()
 				.map(message -> "%s: %s".formatted(role(message), message.getContent()))
 				.collect(Collectors.joining("\n"));
+	}
+
+	private String lastAssistantMessage(LearningSession session) {
+		return session.getChatMessages().stream()
+				.filter(message -> message.getRole() == ChatRole.ASSISTANT)
+				.reduce((first, second) -> second)
+				.map(ChatMessage::getContent)
+				.orElse("");
 	}
 
 	private String answers(LearningSession session) {
