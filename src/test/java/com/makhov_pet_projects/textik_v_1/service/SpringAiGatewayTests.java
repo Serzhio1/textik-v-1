@@ -3,6 +3,7 @@ package com.makhov_pet_projects.textik_v_1.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -42,6 +43,12 @@ class SpringAiGatewayTests {
 			{"textSummary": "Резюме текста", "conversationSummary": "Резюме разговора",
 			 "mistakes": "Ошибки ученика", "conversationGrade": "A2",
 			 "mainErrors": ["Первая ошибка", "Вторая ошибка"]}""";
+
+	private static final String DISCUSSION_JSON = """
+			{"reply": "  Which part did you like most?  ", "correction": "  I have a question.  "}""";
+
+	private static final String CORRECT_DISCUSSION_JSON = """
+			{"reply": "That is a good point.", "correction": "   "}""";
 
 	private final Profile profile = Profile.of(1L, "Люблю IT", "технологии, спорт", "B1");
 
@@ -105,16 +112,30 @@ class SpringAiGatewayTests {
 	}
 
 	@Test
-	@DisplayName("Тест, в котором мы проверяем, что ответ собеседника возвращается без JSON-обёртки")
-	void returnsPlainDiscussionAnswer() {
+	@DisplayName("Тест, в котором мы проверяем, что ответ собеседника и исправление разбираются из JSON")
+	void parsesDiscussionReplyAndCorrection() {
 		//Arrange
-		SpringAiGateway gateway = gatewayAnswering("  Which part did you like most?  ");
+		SpringAiGateway gateway = gatewayAnswering(DISCUSSION_JSON);
 
 		//Act
-		String answer = gateway.continueDiscussion(session(), "Мне понравился пример про привычки");
+		DiscussionTurn turn = gateway.continueDiscussion(session(), "Мне понравился пример про привычки");
 
 		//Assert
-		assertThat(answer).isEqualTo("Which part did you like most?");
+		assertThat(turn.reply()).isEqualTo("Which part did you like most?");
+		assertThat(turn.correction()).isEqualTo("I have a question.");
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что пустое исправление остаётся пустой строкой")
+	void keepsEmptyCorrection() {
+		//Arrange
+		SpringAiGateway gateway = gatewayAnswering(CORRECT_DISCUSSION_JSON);
+
+		//Act
+		DiscussionTurn turn = gateway.continueDiscussion(session(), "I have a question.");
+
+		//Assert
+		assertThat(turn.correction()).isEmpty();
 	}
 
 	@Test
@@ -173,14 +194,33 @@ class SpringAiGatewayTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что ИИ начинает обсуждение вопросом по прочитанному тексту")
+	void opensDiscussionWithQuestion() {
+		//Arrange
+		AtomicReference<Prompt> recorded = new AtomicReference<>();
+		SpringAiGateway gateway = new SpringAiGateway(
+				ChatClient.builder(FakeChatModel.recording(recorded, "  What did you think about the text?  ")));
+		LearningSession session = session();
+
+		//Act
+		String opening = gateway.openDiscussion(session);
+
+		//Assert
+		assertThat(opening).isEqualTo("What did you think about the text?");
+		assertThat(recorded.get().getUserMessage().getText())
+				.contains("Reading is useful.")
+				.contains("B1");
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что в промпт обсуждения уходит прочитанный текст и реплики")
 	void sendsTextAndConversation() {
 		//Arrange
 		AtomicReference<Prompt> recorded = new AtomicReference<>();
 		SpringAiGateway gateway = new SpringAiGateway(
-				ChatClient.builder(FakeChatModel.recording(recorded, "Which part did you like most?")));
+				ChatClient.builder(FakeChatModel.recording(recorded, DISCUSSION_JSON)));
 		LearningSession session = session();
-		session.addUserMessage("Мне понравился пример про привычки");
+		session.addUserMessage("Мне понравился пример про привычки", null);
 
 		//Act
 		gateway.continueDiscussion(session, "А что ещё скажешь?");

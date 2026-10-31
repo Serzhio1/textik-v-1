@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Discussion')}"></head>
+<body>
+<nav th:replace="~{fragments :: nav('home')}"></nav>
+
+<main class="card card--wide">
+	<h1 th:text="${learningSession.title}">Discussion</h1>
+	<p class="topic__desc" th:text="${learningSession.description}">Description</p>
+	<p class="notice error" th:if="${error}">The AI could not reply. Please try again.</p>
+
+	<div class="chat" th:if="${not #lists.isEmpty(messages)}">
+		<div class="chat__message" th:each="message : ${messages}"
+			 th:classappend="${message.role.name() == 'USER'} ? 'is-user' : 'is-ai'">
+			<span class="chat__author" th:text="${message.role.name() == 'USER'} ? 'You' : 'AI'">AI</span>
+			<p class="chat__text" th:text="${message.content}">Message</p>
+			<div class="chat__correction" th:if="${message.correction != null}">
+				<span class="chat__correction-label"
+					  th:text="${#strings.isEmpty(message.correction)} ? 'Looks good — no changes needed' : 'Corrected'">Corrected</span>
+				<p class="chat__text" th:unless="${#strings.isEmpty(message.correction)}"
+				   th:text="${message.correction}">Corrected message</p>
+			</div>
+		</div>
+	</div>
+
+	<form th:action="@{/sessions/{id}/discuss(id=${learningSession.id})}" action="#" method="post">
+		<label for="message">Your message</label>
+		<textarea id="message" name="message" rows="3" placeholder="Write what you think about the text..."></textarea>
+		<button type="submit">Send</button>
+	</form>
+
+	<p class="hint-inline hint-inline--top" th:if="${messagesLeft > 0}"
+	   th:text="|Send ${messagesLeft} more message(s) to finish the discussion.|">Send 3 more message(s) to finish the discussion.</p>
+	<p class="hint-inline hint-inline--top" th:if="${messagesLeft == 0}">
+		You have finished the discussion. The review will be available in the next stage.
+	</p>
+
+	<button type="button" class="button-disabled" disabled title="Available in the next stage">Go to review</button>
+</main>
+</body>
+</html>

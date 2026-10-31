@@ -190,7 +190,7 @@ class ReadingFlowTests extends WebTest {
 		.andExpect(status().is3xxRedirection())
 		.andExpect(redirectedUrl("/select?error=1"));
 
-		assertThat(sessions.count()).isZero();
+		assertThat(sessions.findByUserIdOrderByIdDesc(user.getId())).isEmpty();
 	}
 
 	@Test

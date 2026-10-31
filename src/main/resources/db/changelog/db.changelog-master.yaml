@@ -17,3 +17,6 @@ databaseChangeLog:
   - include:
       file: changesets/006-create-session-reviews.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changesets/007-add-chat-message-correction.yaml
+      relativeToChangelogFile: true

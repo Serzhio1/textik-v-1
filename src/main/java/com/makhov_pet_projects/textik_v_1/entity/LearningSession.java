@@ -71,6 +71,7 @@ public class LearningSession {
 	private List<Question> questions = new ArrayList<>();
 
 	@OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OrderBy("id ASC")
 	@ToString.Exclude
 	private List<ChatMessage> chatMessages = new ArrayList<>();
 
@@ -95,12 +96,18 @@ public class LearningSession {
 		}
 	}
 
+	public void startDiscussing() {
+		if (status == SessionStatus.THINK) {
+			advance();
+		}
+	}
+
 	public void addQuestion(String prompt, List<String> options, String correctAnswer, String explanation) {
 		questions.add(Question.singleChoice(this, prompt, options, correctAnswer, explanation));
 	}
 
-	public void addUserMessage(String content) {
-		chatMessages.add(ChatMessage.fromUser(this, content));
+	public void addUserMessage(String content, String correction) {
+		chatMessages.add(ChatMessage.fromUser(this, content, correction));
 	}
 
 	public void addAssistantMessage(String content) {

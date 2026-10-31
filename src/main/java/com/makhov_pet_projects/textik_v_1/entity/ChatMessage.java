@@ -46,18 +46,22 @@ public class ChatMessage {
 	@Column(name = "content", nullable = false, columnDefinition = "text")
 	private String content;
 
-	static ChatMessage fromUser(LearningSession session, String content) {
-		return new ChatMessage(session, ChatRole.USER, content);
+	@Column(name = "correction", columnDefinition = "text")
+	private String correction;
+
+	static ChatMessage fromUser(LearningSession session, String content, String correction) {
+		return new ChatMessage(session, ChatRole.USER, content, correction);
 	}
 
 	static ChatMessage fromAssistant(LearningSession session, String content) {
-		return new ChatMessage(session, ChatRole.ASSISTANT, content);
+		return new ChatMessage(session, ChatRole.ASSISTANT, content, null);
 	}
 
-	private ChatMessage(LearningSession session, ChatRole role, String content) {
+	private ChatMessage(LearningSession session, ChatRole role, String content, String correction) {
 		this.session = session;
 		this.role = role;
 		this.content = content;
+		this.correction = correction;
 	}
 
 }

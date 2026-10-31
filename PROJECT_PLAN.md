@@ -10,7 +10,7 @@
 
 ```bash
 docker compose up -d            # Postgres 17, хост-порт 5433
-./mvnw test                     # 145 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
+./mvnw test                     # 168 тестов, ~40 с; БД в тестах — Testcontainers, compose не нужен
 ./mvnw spring-boot:run          # http://localhost:8080
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # офлайн, без ключа ИИ
 ```
@@ -18,9 +18,9 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - **Стек:** Java 21, Spring Boot **4.1.1**, Spring Security 7, Spring Data JPA, Thymeleaf,
   Liquibase, Spring AI 2.0.1 (OpenAI-совместимый клиент), Postgres 17, Lombok.
 - **Структура кода:** 10 плоских пакетов, таблица и направления зависимостей — **6.8**.
-- **Сделано:** Этапы 0–7 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
-  создание сессии + чтение + вопросы) — **3.1–3.10**.
-- **Следующий этап:** 8 — обсуждение (Discuss) — **4**.
+- **Сделано:** Этапы 0–8 (инфраструктура, домен, аутентификация, онбординг, слой ИИ,
+  создание сессии + чтение + вопросы + обсуждение) — **3.1–3.11**.
+- **Следующий этап:** 9 — ревью (Review) — **4**.
 - **Правила и запреты:** 6 (комментарии, Lombok, тесты) и 5.1 (не трогать changeset-файлы,
   не заводить `src/test/resources/application.yaml`).
 - **Ключ ИИ не нужен для разработки:** профиль `local` подставляет заглушку (5.1).
@@ -35,7 +35,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 
 1. **Read** (~20 мин) — текст, сгенерированный ИИ под интересы и уровень.
 2. **Think** (5–10 мин) — 5–10 single-choice вопросов по тексту, после каждого ответа — объяснение.
-3. **Discuss** (15–20 мин) — диалог с ИИ по тексту, 3–5 обменов, ИИ держит тему.
+3. **Discuss** (15–20 мин) — диалог с ИИ по тексту, минимум 3 обмена со стороны ученика, ИИ держит тему.
 4. **Review** (~5 мин) — суммаризация, ошибки в тестах, оценка уровня разговора, разбор ошибок.
 
 ### Экраны по ТЗ
@@ -74,7 +74,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 | 15 | Обязательность онбординга | **`HandlerInterceptor`** | Пока у пользователя нет `Profile`, любой защищённый маршрут (кроме `/onboarding`, `/logout`, `/login`, `/register`, `/error`, `/css/**`) отвечает 302 на `/onboarding`. Реализация — `OnboardingInterceptor` + `WebConfig`; `SecurityConfig` не менялся, `/onboarding` и `/progress` уже под `anyRequest().authenticated()` |
 | 16 | Редактирование профиля | **Только `about`, `interests`, `level`** | Имя и email задаются при регистрации и на странице прогресса только показываются |
 | 17 | Ввод интересов | **Одно поле через запятую, показ — «чипсами»** | Без JS-редактора тегов: `Interests.split()` режет строку для показа, `Interests.normalize()` чистит и склеивает перед сохранением (`" технологии , спорт ,,"` → `"технологии, спорт"`) |
-| 18 | Момент генерации контента | **При создании сессии (выбор темы)** | Текст + вопросы генерируются сразу, сессия рождается в статусе `READ`, поднимается в БД. Обсуждение — живой ИИ по одному обмену (Этап 8); ревью — в конце (Этап 9). Сбой генерации → ничего не сохраняется, повтор на `/select` |
+| 18 | Момент генерации контента | **При создании сессии (выбор темы)** | Текст + вопросы генерируются сразу, сессия рождается в статусе `READ`, поднимается в БД. Обсуждение — живой ИИ, минимум 3 реплики ученика (Этап 8); ревью — в конце (Этап 9). Сбой генерации → ничего не сохраняется, повтор на `/select` |
 | 19 | История на «Прогрессе» | **Только `DONE`-сессии** | Незавершённые сессии в истории не показываются: запрос `findByUserIdAndStatusOrderByIdDesc(userId, DONE)` |
 | 20 | Ответ `chat.completions` GigaChat | **Недо-стандартный: нет `id` и бывает «сырой» JSON** | GigaChat не шлёт `id` (обязателен для openai-java SDK) и иногда вставляет неэкранированные control-символы внутрь JSON-строк (`Invalid control character`). Перехватчик `chatCompletionIdCustomizer` на ответах `/chat/completions` с `choices` перечитывает JSON «мягко» (`JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS`), добавляет синтетический `id` и пере-сериализует — управляющие символы экранируются, SDK получает валидное тело |
 | 21 | Контент `content` GigaChat | **Тройная защита: промпт + санитайзер + ретрай** | Модель кладёт в `content` JSON с «сырыми» (неэкранированными) переносами строк внутри строк — строгий разбор `BeanOutputConverter` (Jackson 3) падает, либо выдаёт дегенеративный ответ (`"description"`). Защита: (1) в промпт добавлены жёсткие правила «никаких ```json-блоков, реальный Enter внутри строк запрещён — пиши `\n`»; (2) `ChatCompletionJson.sanitize()` перечитывает блок «мягким» парсером и пере-сериализует; (3) при неразобранном ответе структурный вызов повторяется один раз. Каждый сбой и сам «сырой» ответ модели пишутся в лог |
@@ -116,10 +116,10 @@ docker compose up -d            # Postgres 17, хост-порт 5433
   Комментарии в файле — только «почему».
 - `db/changelog/db.changelog-master.yaml` подключает `changesets/001-create-users`,
   `002-create-profiles`, `003-create-sessions`, `004-create-questions`, `005-create-chat-messages`,
-  `006-create-session-reviews`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
+  `006-create-session-reviews`, `007-add-chat-message-correction`. Схема упрощена для MVP: нет индексов; убраны `proposals`,
   `avatar_url`, `updated_at`, `display_name`, `created_at`/`finished_at` (sessions), `q_index`,
   `answered_at`, `q_type` (и его CHECK). Остались CHECK на `level`, `status`, `role`.
-  **Changeset-файлы 001–006 не редактируем** (сломается checksum) — только новые.
+  **Changeset-файлы 001–007 не редактируем** (сломается checksum) — только новые.
 - Приложение стартует ~8 с, Liquibase применяет миграции при старте.
 
 ### 3.2 Домен (Этап 2, выполнен)
@@ -130,12 +130,13 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 - `enums`: `SessionStatus`, `ChatRole` (USER/ASSISTANT). `QuestionType` не нужен — все вопросы
   одного типа. Уровень оставлен `String`, валидность гарантируют CHECK-ограничения.
 - `repository`: 6 интерфейсов Spring Data JPA с derived-запросами под экраны, включая
-  `findByIdAndUserId` (проверка владельца сессии) и `countBySessionIdAndRole` (лимит обсуждения).
+  `findByIdAndUserId` (проверка владельца сессии) и `countBySessionIdAndRole` (число реплик ученика).
 - Особенности маппинга:
   - `@GeneratedValue(strategy = IDENTITY)` (в БД `GENERATED BY DEFAULT AS IDENTITY`);
   - `questions.options` — JSONB через `@JdbcTypeCode(SqlTypes.JSON)` → `List<String>`;
   - текстовые колонки помечены `columnDefinition = "text"` — иначе `ddl-auto: validate`
-    ругается на расхождение `text` / `varchar(255)`;
+    ругается на расхождение `text` / `varchar(255)`; `chat_messages.correction` — nullable
+    `text` для исправленной версии реплики ученика;
   - `session_reviews.created_at` — `Instant` (→ `timestamptz`), заполняется приложением;
   - `Profile.userId` — assigned-id без ассоциации на `AppUser` (5.1, последний пункт).
 - `ddl-auto: validate` проходит: схема и сущности согласованы.
@@ -195,14 +196,14 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 
 | Слой | Классы | Роль |
 |------|--------|------|
-| `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `continueDiscussion`, `generateReview` |
+| `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion`, `continueDiscussion`, `generateReview` |
 | `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
-| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~350 слов, 5 вопросов, реплики по ходу разговора, итоги |
+| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~350 слов, 5 вопросов, стартовый вопрос и реплики по ходу разговора, итоги |
 | `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
 | `service` | `GigaChatTokenService` | Обмен `Authorization key` на `access_token` (30 минут): кэш, обновление за минуту до истечения, один обмен под конкуренцией; ключ и токен не логируются |
-| `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | Records structured output |
+| `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `DiscussionTurn`, `ReviewData` | Records structured output |
 | `exceptions` | `AiGatewayException` | Единая ошибка слоя ИИ (endpoint, пустой ответ, неразбираемый JSON) |
-| `utility` | `AiPrompts` | 5 промптов (темы, текст, вопросы, обсуждение, ревью) как `@UtilityClass`-константы |
+| `utility` | `AiPrompts` | 6 промптов (темы, текст, вопросы, стартовый вопрос обсуждения, обсуждение, ревью) как `@UtilityClass`-константы |
 | `config` | `AiGatewayConfig`, `AiProperties` | Выбор реализации: профиль `local` или `app.ai.provider=stub` → заглушка, иначе → боевая; `app.ai.fallback` → обёртка резервной |
 | `config` | `GigaChatClientConfig`, `GigaChatProperties` | При `app.ai.provider=gigachat`: клиент выдачи токена, перехватчик `Authorization` → `Bearer <access_token>` и перехватчик, добавляющий `id` в ответ `chat.completions` (20) |
 
@@ -243,15 +244,15 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 - `continueDiscussion` и `generateReview` читают `chatMessages` и `questions` сессии, поэтому
   вызывающий код обязан быть `@Transactional` (см. 5.1).
 
-### 3.6 Тесты — 145, `./mvnw test` зелёные (~40 с)
+### 3.6 Тесты — 168, `./mvnw test` зелёные (~40 с)
 
 | Слой | Классы | Тестов |
 |------|--------|--------|
-| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 9 | 18 |
+| Юнит, домен (без Spring и БД) | `QuestionTests` 4, `SessionStatusTests` 5, `LearningSessionTests` 12 | 21 |
 | Юнит, утилиты (без Spring и БД) | `InitialsTests` 3, `ChatCompletionIdsTests` 6, `ChatCompletionJsonTests` 6 | 15 |
-| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 12, `StubAiGatewayTests` 5, `FallbackAiGatewayTests` 3, `GigaChatTokenServiceTests` 7 | 27 |
-| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 7, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 4, `SessionReviewRepositoryTests` 4 | 28 |
-| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8 | 37 |
+| Юнит, слой ИИ (без Spring и сети) | `SpringAiGatewayTests` 14, `StubAiGatewayTests` 7, `FallbackAiGatewayTests` 5, `GigaChatTokenServiceTests` 7 | 33 |
+| Репозитории (`@DataJpaTest` + Testcontainers) | `AppUserRepositoryTests` 4, `ProfileRepositoryTests` 4, `SessionRepositoryTests` 8, `QuestionRepositoryTests` 5, `ChatMessageRepositoryTests` 5, `SessionReviewRepositoryTests` 4 | 30 |
+| Веб-слой (MockMvc) | `RegistrationTests` 6, `LoginTests` 4, `OnboardingTests` 7, `ProgressTests` 6, `ReadingFlowTests` 6, `ThinkFlowTests` 8, `DiscussFlowTests` 12 | 49 |
 | Конфигурация бинов | `AiGatewayWiringTests` 1, `LocalAiGatewayWiringTests` 1, `AiGatewaySelectionTests` 6, `GigaChatClientConfigTests` 5, `AiPropertiesTests` 4, `GigaChatPropertiesTests` 2 | 19 |
 | Smoke | `TextikV1ApplicationTests` (контекст + схема из миграций) | 1 |
 
@@ -286,12 +287,13 @@ CSRF-токен после входа перевыпускается (5.1).
 запросы проходят; перехватчик `chatCompletionIdCustomizer` и санитайзер `ChatCompletionJson`
 чинят недо-стандартный ответ (20, 21). Автоматические тесты дополнительно проверяют разбор
 JSON, отказоустойчивость и оба режима wiring (3.6). На Этап 10 остаётся живой прогон всех
-пяти методов `AiGateway`; README с переменными окружения уже есть, его нужно дополнить
+шести методов `AiGateway`; README с переменными окружения уже есть, его нужно дополнить
 инструкцией по получению ключа.
 
 ### 3.8 Чего ещё нет
 
-- Обсуждение (8), ревью (9). Слой ИИ к ним готов.
+- Ревью (9): генерация итогов, `review.html`, сохранение в `session_reviews`, `DISCUSS → DONE`.
+  Слой ИИ (`generateReview`) к нему готов.
 - Восстановление пароля, аватар с загрузкой, статистика между сессиями — вне скоупа MVP.
 
 ### 3.9 Создание сессии, выбор темы, чтение (Этап 6, выполнен)
@@ -338,10 +340,49 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   `/think?error=1`. Успешная отправка сохраняет все ответы и возвращает на `/think`.
 - **Результаты.** После отправки у каждого вопроса видны ответ пользователя, правильный ответ,
   объяснение и отметка «Correct/Incorrect». Внизу — счёт правильных/неправильных ответов и
-  отключённая кнопка «To discussion» (включится на Этапе 8).
+  ссылка «To discussion».
 - **Повторная отправка.** Завершённая страница вопросов не перезаписывает уже сохранённые ответы.
 - Проверка фиксируется `ThinkFlowTests` (8), плюс юнит-тесты `LearningSessionTests` (2) и
   `SessionRepositoryTests` (1).
+
+### 3.11 Обсуждение (Этап 8, выполнен)
+
+| Слой | Классы | Роль |
+|------|--------|------|
+| `controller` | `SessionController` | `GET /sessions/{id}/discuss`, `POST /sessions/{id}/discuss` |
+| `service` | `SessionService` | `startDiscussion` (сессия с перепиской + `THINK → DISCUSS`), `sendMessage`, `tryOpenDiscussion` |
+| `repository` | `SessionRepository` | `findWithChatMessagesByIdAndUserId` — сессия с перепиской только для владельца (`@EntityGraph`) |
+| `entity` | `LearningSession`, `ChatMessage` | `startDiscussing` — идемпотентный переход `THINK → DISCUSS`; `chatMessages` упорядочены `@OrderBy("id ASC")`; `ChatMessage.correction` — исправленная версия реплики ученика |
+| `service` | `AiGateway` | `openDiscussion` — стартовый вопрос; `continueDiscussion` — `DiscussionTurn` (ответ + исправление) |
+| `dto` | `DiscussionTurn` | Structured output обсуждения: `reply` и `correction` |
+| `utility` | `AiPrompts` | `DISCUSSION_OPENING_USER` — промпт стартового вопроса; `DISCUSSION_*` — ответ и исправление реплики |
+| Шаблоны | `discuss.html`, `think.html` | переписка, поле ввода, счётчик реплик; ссылка с вопросов |
+
+Поведение:
+
+- **Первый заход.** `GET /discuss` загружает сессию с перепиской, переводит `THINK → DISCUSS`
+  и, если переписка пуста, просит ИИ стартовый вопрос и сохраняет его. Чужая или отсутствующая
+  сессия → 404; сессия в `READ` → редирект на `/think`; в `DISCUSS`/`DONE` страница доступна.
+- **Ответ.** `POST /discuss` принимает непустую реплику, получает `DiscussionTurn` от ИИ,
+  сохраняет обе реплики (`USER` с `correction`, затем `ASSISTANT` с `null`) и делает редирект
+  на `/discuss` (PRG). Ответ ИИ запрашивается **до** сохранения реплики ученика: промпт
+  `continueDiscussion` уже содержит её текст.
+- **Исправление.** Под репликой ученика справа показывается исправленный вариант только этой
+  реплики (`Corrected` + текст). Если модель вернула пустой `correction`, выводится
+  «Looks good — no changes needed»; у старых сообщений и реплик ИИ `correction = null`, блок
+  не рендерится. Исходный текст ученика не меняется и остаётся в истории/промпте ревью.
+- **Порог ревью.** После 3 реплик ученика (`REVIEW_AFTER_USER_TURNS = 3`) страница сообщает,
+  что обсуждение завершено, но кнопка «Go to review» остаётся отключённой до Этапа 9. Верхней
+  границы обмена нет — ученик может продолжать разговор.
+- **Ошибки ИИ.** Сбой стартового вопроса не роняет страницу: `tryOpenDiscussion` пишет
+  предупреждение в лог, чат остаётся пустым, обновление страницы повторяет попытку. Сбой ответа
+  откатывает транзакцию (ничего не сохраняется) и возвращает `/discuss?error=1` с английским
+  сообщением. Пустая реплика — тоже `?error=1`.
+- **Миграция.** `chat_messages` и `SessionStatus.DISCUSS` уже были в схеме; для исправлений
+  добавлен nullable `correction TEXT` (changeset `007-add-chat-message-correction`).
+- Проверка фиксируется `DiscussFlowTests` (12), плюс `LearningSessionTests` (+3),
+  `SessionRepositoryTests` (+1), `ChatMessageRepositoryTests` (+1), `SpringAiGatewayTests` (+2),
+  `StubAiGatewayTests` (+1), `FallbackAiGatewayTests` (+1).
 
 ---
 
@@ -375,16 +416,17 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 ### Этап 5. Слой ИИ (AiGateway) — выполнен
 - [x] Интерфейс `AiGateway` + records structured output в `dto`: `TopicProposal`,
       `GeneratedText`, `GeneratedQuestion`, `ReviewData`.
-- [x] Методы: `generateTopics`, `generateText`, `generateQuestions`, `continueDiscussion`,
-      `generateReview`.
+- [x] Методы: `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion` (добавлен
+      на Этапе 8), `continueDiscussion`, `generateReview`.
 - [x] Реализация через Spring AI `ChatClient` (OpenAI-стартер, любой совместимый endpoint),
       Structured Output через `BeanOutputConverter`.
 - [x] Промпты (`utility/AiPrompts`):
       1. 3 идеи тем по интересам/уровню → экран выбора;
       2. полный текст 350–500 слов под уровень;
       3. 5–10 вопросов (один правильный из 4 вариантов) с правильными ответами и объяснениями;
-      4. обсуждение — «держимся темы, возвращаем ушедшего» (лимит 3–5 обменов считает Этап 8);
-      5. ревью — резюме, частые ошибки, оценка уровня разговора.
+      4. стартовый вопрос обсуждения (добавлен на Этапе 8);
+      5. обсуждение — «держимся темы, возвращаем ушедшего» (порог 3 реплики ученика считает Этап 8);
+      6. ревью — резюме, частые ошибки, оценка уровня разговора.
 - [x] **Заглушка** для профиля `local` и `AI_PROVIDER=stub` без API-ключа + `FallbackAiGateway`
       как резервная модель.
 - [x] **GigaChat как провайдер по умолчанию:** `GigaChatTokenService` (обмен `Authorization key`
@@ -392,7 +434,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       `GigaChatClientConfig` (перехватчик заголовка авторизации). Модель по умолчанию `GigaChat-2`.
 - [x] Проверка: 46 тестов слоя ИИ и конфигурации, сеть не используется; полный цикл офлайн
       проверяется на Этапах 6–9. Живой вызов с настоящим ключом GigaChat проверен (3.7, 5);
-      живой прогон всех пяти методов — Этап 10.
+      живой прогон всех шести методов — Этап 10.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
 - [x] Home: название приложения, 4 плашки этапов с временем + «Начать сессию».
@@ -409,15 +451,26 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - [x] Все вопросы из уже сгенерированных (Этап 6) показываются на одной странице; ответы
       отправляются одной формой, проверка детерминированная (сравнение с `correct_answer`).
 - [x] После отправки — объяснение, правильный ответ и отметка Correct/Incorrect по каждому вопросу;
-      внизу счёт правильно/неправильно и «К обсуждению» (заглушка до Этапа 8).
+      внизу счёт правильно/неправильно и ссылка «To discussion».
 - [x] Первый визит переводит сессию `READ → THINK`; повторная отправка не перезаписывает ответы.
 - [x] Проверка: `ThinkFlowTests` (8), `LearningSessionTests` (+2), `SessionRepositoryTests` (+1).
 
-### Этап 8. Обсуждение (Discuss)
-- [ ] `discuss.html`: диалоговое окно (переписка из `chat_messages`), поле ввода.
-- [ ] Отправка → ответ ИИ (промпт этапа 5, пункт 4). Счётчик обменов: после 3–5 со стороны
-      юзера активируется «Перейти к ревью».
-- [ ] Проверка: отвлекаюсь от темы — ИИ возвращает к тексту; после лимита доступно ревью.
+### Этап 8. Обсуждение (Discuss) — выполнен
+- [x] `discuss.html`: диалоговое окно (переписка из `chat_messages`), поле ввода, счётчик
+      оставшихся реплик до порога ревью.
+- [x] Первый заход `THINK → DISCUSS`, ИИ задаёт стартовый вопрос (`openDiscussion`), переписка
+      сохраняется в `chat_messages`.
+- [x] Отправка → `DiscussionTurn` от ИИ (ответ + исправление); под репликой ученика справа
+      показывается исправленный вариант или подтверждение, что всё корректно. После 3 реплик
+      ученика страница сообщает о завершении обсуждения, но «Go to review» остаётся отключённой
+      до Этапа 9.
+- [x] Исправление хранится в `chat_messages.correction` (changeset `007`) и не заменяет исходную
+      реплику ученика.
+- [x] Сбой ИИ не теряет данные: стартовый вопрос повторяется при обновлении, ответ на реплику
+      откатывается и показывает `/discuss?error=1`.
+- [x] Проверка: `DiscussFlowTests` (12), `LearningSessionTests` (+3), `SessionRepositoryTests` (+1),
+      `ChatMessageRepositoryTests` (+1), тесты слоя ИИ (+6). Возврат к теме при уходе — поведение
+      модели, живая проверка на Этапе 10.
 
 ### Этап 9. Ревью (Review)
 - [ ] `generateReview()`: резюме, число ошибок в тестах, оценка уровня разговора, разбор
@@ -436,7 +489,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - [ ] Тесты: проверка ответа, проверка владельца, генерация через stub.
 - [ ] README: как получить ключ (GigaChat/OpenAI/другой провайдер), какие поля конфига
       заполнить: `AI_PROVIDER`, `GIGACHAT_AUTH_KEY` или `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`,
-      необязательный `AI_FALLBACK`; живой вызов всех пяти методов `AiGateway`.
+      необязательный `AI_FALLBACK`; живой вызов всех шести методов `AiGateway`.
 - [ ] `./mvnw test` зелёный, полный пользовательский сценарий без падений.
 
 ---
@@ -503,6 +556,25 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   `chatMessages` и `questions` (LAZY, при `open-in-view: false`). Вызывающий код обязан быть
   `@Transactional`, иначе `LazyInitializationException`. Если понадобится вызывать вне
   транзакции — переходить на `fetch = EAGER` или на отдельные запросы.
+- **Порог ревью — 3 реплики ученика, без верхней границы.** Считаются только сообщения с ролью
+  `USER`; стартовый вопрос ИИ не в счёт. Порог задан константой
+  `SessionService.REVIEW_AFTER_USER_TURNS`; на Этапе 8 кнопка «Go to review» остаётся
+  отключённой, активация — на Этапе 9.
+- **Стартовый вопрос — отдельный метод `openDiscussion`, а не `continueDiscussion` с пустой
+  репликой.** Он генерируется только когда переписка пуста; при сбое статус уже `DISCUSS`,
+  поэтому обновление страницы повторяет попытку, а не зацикливает редирект.
+- **Ответ ИИ запрашивается до сохранения реплики ученика.** Промпт `continueDiscussion` уже
+  содержит её текст; если сохранить первой, реплика попадёт в историю дважды. Порядок в
+  `sendMessage`: вызов ИИ → сохранение `USER` → сохранение `ASSISTANT`; при сбое транзакция
+  откатывает всё.
+- **Исправление реплики приходит тем же structured-вызовом.** `continueDiscussion` возвращает
+  `DiscussionTurn(reply, correction)`: второй запрос к модели не нужен, ответ и исправление
+  сохраняются атомарно. `correction` — только исправленное предложение без пояснений; пустая
+  строка означает «ошибок нет», `null` — блок не показывается (старые сообщения и реплики ИИ).
+  В историю и промпт ревью идёт исходный текст ученика, а не исправление.
+- **Переписка грузится вместе с сессией** через `findWithChatMessagesByIdAndUserId`
+  (`@EntityGraph`): при `open-in-view: false` иначе будет `LazyInitializationException`.
+  Порядок реплик гарантирует `@OrderBy("id ASC")` на `LearningSession.chatMessages`.
 - **`ReviewData` не содержит числа вопросов:** их считает код по `Question.isCorrect()`,
   поручать счёт модели нельзя. В `session_reviews` они и так есть (`SessionReview.of`).
 - **Замена `Profile` (сущность) на `@Profile` (аннотация) в одном файле невозможна** — Java
@@ -511,8 +583,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   знать: **любая ошибка компиляции в одном классе «ломает» Lombok во всём модуле** — annotation
   processing не доходит до конца, и в ошибках появляются фантомные «cannot find symbol: getRole()»
   на сгенерированных Lombok-методах. Настоящая первая ошибка — в начале списка.
-- **Changeset-файлы 001–006 не трогаем** — иначе сломается checksum. Новые изменения — новыми
-  файлами (нумерация с 007).
+- **Changeset-файлы 001–007 не трогаем** — иначе сломается checksum. Новые изменения — новыми
+  файлами (следующий свободный номер — 008).
 - **`src/test/resources/application.yaml` заводить нельзя** — одноимённый файл затеняет
   `src/main/resources/application.yaml`, в тестах пропадают `spring.ai.openai.*`, и контекст падает
   с «At least one credential source must be specified». Тестовые настройки — только
@@ -551,14 +623,14 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   токен на каждый запрос), Thymeleaf подставляет скрытое поле `_csrf` сам.
 - **Схема упрощена под MVP:** `sessions.proposals` нет (темы хранятся в HTTP-сессии),
   `sessions.created_at`/`finished_at` нет (история сортируется по `id`; нужны даты — changeset
-  007 `ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`), `q_type` нет (все вопросы
+  008 `ADD COLUMN created_at TIMESTAMPTZ NOT NULL DEFAULT now()`), `q_type` нет (все вопросы
   single-choice), `users.display_name` нет (роль играет `username`).
 - **`Profile` не связан ассоциацией с `AppUser`:** `profiles.user_id` — общий PK (PK = FK на
   `users.id`), что несовместимо со Spring Data JPA («must be manually assigned before persist()»
   и «This class does not define an IdClass»). **Решено:** `user_id` — assigned-id
   (`Long userId`), профиль берётся из `profileRepository.findById(currentUserId)`, каскада нет
   (удаление профиля делает `ON DELETE CASCADE` в БД). Понадобится `user.getProfile()` — changeset
-  007 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
+  008 с отдельным `id BIGINT GENERATED ... IDENTITY` + `UNIQUE (user_id)`.
 - **Проверка «профиль заполнен» живёт в MVC-слое, а не в `SecurityConfig`:** `HandlerInterceptor`
   вызывается после фильтров, поэтому анонимного пользователя до него не доходит, а
   `Authentication` уже в `SecurityContext` — principal доступен без запроса к БД. Проверка

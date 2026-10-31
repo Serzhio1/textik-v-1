@@ -80,6 +80,37 @@ class LearningSessionTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что метод startDiscussing переводит вопросы к обсуждению")
+	void startDiscussingMovesThinkToDiscuss() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+		session.startThinking();
+
+		//Act
+		session.startDiscussing();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.DISCUSS);
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что повторный startDiscussing не двигает сессию дальше")
+	void startDiscussingKeepsDiscussStatus() {
+		//Arrange
+		LearningSession session = proposedSession();
+		session.advance();
+		session.startThinking();
+		session.startDiscussing();
+
+		//Act
+		session.startDiscussing();
+
+		//Assert
+		assertThat(session.getStatus()).isEqualTo(SessionStatus.DISCUSS);
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что добавленный вопрос попадает в коллекцию вопросов сессии")
 	void addsQuestionToSession() {
 		//Arrange
@@ -99,11 +130,25 @@ class LearningSessionTests {
 		LearningSession session = proposedSession();
 
 		//Act
-		session.addUserMessage("Почему сон важен?");
+		session.addUserMessage("Почему сон важен?", null);
 
 		//Assert
 		assertThat(session.getChatMessages()).first()
 				.extracting(ChatMessage::getRole).isEqualTo(ChatRole.USER);
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что исправленный вариант реплики сохраняется вместе с сообщением")
+	void storesUserMessageCorrection() {
+		//Arrange
+		LearningSession session = proposedSession();
+
+		//Act
+		session.addUserMessage("I has a question.", "I have a question.");
+
+		//Assert
+		assertThat(session.getChatMessages()).first()
+				.extracting(ChatMessage::getCorrection).isEqualTo("I have a question.");
 	}
 
 	@Test
@@ -125,9 +170,9 @@ class LearningSessionTests {
 	void countsOnlyUserTurns() {
 		//Arrange
 		LearningSession session = proposedSession();
-		session.addUserMessage("Первый вопрос");
+		session.addUserMessage("Первый вопрос", null);
 		session.addAssistantMessage("Первый ответ");
-		session.addUserMessage("Второй вопрос");
+		session.addUserMessage("Второй вопрос", null);
 		session.addAssistantMessage("Второй ответ");
 
 		//Act

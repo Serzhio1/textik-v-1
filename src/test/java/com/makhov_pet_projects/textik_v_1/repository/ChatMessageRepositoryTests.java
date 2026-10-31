@@ -31,7 +31,7 @@ class ChatMessageRepositoryTests extends PostgresRepositoryTest {
 		//Arrange
 		AppUser user = TestFixtures.user(users);
 		LearningSession session = LearningSession.proposed(user, "A1");
-		session.addUserMessage("Почему сон важен?");
+		session.addUserMessage("Почему сон важен?", null);
 		session.addAssistantMessage("Потому что он влияет на память.");
 		sessions.saveAndFlush(session);
 
@@ -49,9 +49,9 @@ class ChatMessageRepositoryTests extends PostgresRepositoryTest {
 		//Arrange
 		AppUser user = TestFixtures.user(users);
 		LearningSession session = LearningSession.proposed(user, "A1");
-		session.addUserMessage("Первый вопрос");
+		session.addUserMessage("Первый вопрос", null);
 		session.addAssistantMessage("Первый ответ");
-		session.addUserMessage("Второй вопрос");
+		session.addUserMessage("Второй вопрос", null);
 		sessions.saveAndFlush(session);
 
 		//Act
@@ -75,6 +75,22 @@ class ChatMessageRepositoryTests extends PostgresRepositoryTest {
 
 		//Assert
 		assertThat(stored.getContent()).isEqualTo("Давай вернёмся к тексту.");
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что исправленная версия реплики сохраняется в базе")
+	void storesUserCorrection() {
+		//Arrange
+		AppUser user = TestFixtures.user(users);
+		LearningSession session = LearningSession.proposed(user, "A1");
+		session.addUserMessage("I has a question.", "I have a question.");
+		sessions.saveAndFlush(session);
+
+		//Act
+		ChatMessage stored = chatMessages.findBySessionIdOrderById(session.getId()).getFirst();
+
+		//Assert
+		assertThat(stored.getCorrection()).isEqualTo("I have a question.");
 	}
 
 	@Test

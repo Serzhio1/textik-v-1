@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 7-add-chat-message-correction
+      author: textik
+      comment: Corrected version of learner chat messages
+      changes:
+        - addColumn:
+            tableName: chat_messages
+            columns:
+              - column:
+                  name: correction
+                  type: TEXT

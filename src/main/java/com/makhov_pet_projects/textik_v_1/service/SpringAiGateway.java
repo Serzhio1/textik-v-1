@@ -1,5 +1,6 @@
 package com.makhov_pet_projects.textik_v_1.service;
 
+import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ProfileForm;
@@ -61,11 +62,20 @@ public class SpringAiGateway implements AiGateway {
 	}
 
 	@Override
-	public String continueDiscussion(LearningSession session, String userMessage) {
+	public String openDiscussion(LearningSession session) {
+		String user = String.format(AiPrompts.DISCUSSION_OPENING_USER,
+				session.getTitle(), session.getDescription(), session.getLevel(), session.getTextContent());
+		return ask(AiPrompts.DISCUSSION_SYSTEM, user).trim();
+	}
+
+	@Override
+	public DiscussionTurn continueDiscussion(LearningSession session, String userMessage) {
+		StructuredOutputConverter<DiscussionTurn> converter = new BeanOutputConverter<>(DiscussionTurn.class);
 		String user = String.format(AiPrompts.DISCUSSION_USER,
 				session.getTitle(), session.getDescription(), session.getLevel(),
 				session.getTextContent(), conversation(session), userMessage);
-		return ask(AiPrompts.DISCUSSION_SYSTEM, user).trim();
+		DiscussionTurn turn = askStructured(converter, AiPrompts.DISCUSSION_SYSTEM, user);
+		return new DiscussionTurn(trimmed(turn.reply()), trimmed(turn.correction()));
 	}
 
 	@Override
@@ -133,6 +143,10 @@ public class SpringAiGateway implements AiGateway {
 			log.warn("Текст ответа модели: {}", preview(answer));
 			throw new AiGatewayException("Не удалось разобрать ответ модели", e);
 		}
+	}
+
+	private String trimmed(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private String preview(String answer) {

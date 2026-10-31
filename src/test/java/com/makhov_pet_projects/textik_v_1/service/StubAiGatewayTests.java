@@ -2,6 +2,7 @@ package com.makhov_pet_projects.textik_v_1.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.makhov_pet_projects.textik_v_1.dto.DiscussionTurn;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedQuestion;
 import com.makhov_pet_projects.textik_v_1.dto.GeneratedText;
 import com.makhov_pet_projects.textik_v_1.dto.ReviewData;
@@ -63,20 +64,41 @@ class StubAiGatewayTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что заглушка начинает обсуждение вопросом")
+	void opensDiscussionWithQuestion() {
+		//Act
+		String opening = gateway.openDiscussion(session());
+
+		//Assert
+		assertThat(opening).isNotBlank();
+		assertThat(opening).endsWith("?");
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что заглушка меняет реплики по ходу разговора")
 	void changesReplyAsConversationGrows() {
 		//Arrange
 		LearningSession session = session();
-		session.addUserMessage("Мне понравился первый абзац");
+		session.addUserMessage("Мне понравился первый абзац", null);
 
 		//Act
-		String first = gateway.continueDiscussion(session, "Первый вопрос");
-		session.addAssistantMessage(first);
-		session.addUserMessage("Второй вопрос");
-		String second = gateway.continueDiscussion(session, "Второй вопрос");
+		DiscussionTurn first = gateway.continueDiscussion(session, "Первый вопрос");
+		session.addAssistantMessage(first.reply());
+		session.addUserMessage("Второй вопрос", null);
+		DiscussionTurn second = gateway.continueDiscussion(session, "Второй вопрос");
 
 		//Assert
-		assertThat(first).isNotEqualTo(second);
+		assertThat(first.reply()).isNotEqualTo(second.reply());
+	}
+
+	@Test
+	@DisplayName("Тест, в котором мы проверяем, что заглушка возвращает исправленный вариант реплики")
+	void returnsUserCorrection() {
+		//Act
+		DiscussionTurn turn = gateway.continueDiscussion(session(), "I has a question");
+
+		//Assert
+		assertThat(turn.correction()).isNotBlank();
 	}
 
 	@Test

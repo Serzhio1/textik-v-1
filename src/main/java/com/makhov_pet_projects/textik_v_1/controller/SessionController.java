@@ -6,6 +6,7 @@ import com.makhov_pet_projects.textik_v_1.dto.TopicProposal;
 import com.makhov_pet_projects.textik_v_1.entity.LearningSession;
 import com.makhov_pet_projects.textik_v_1.entity.Profile;
 import com.makhov_pet_projects.textik_v_1.entity.Question;
+import com.makhov_pet_projects.textik_v_1.enums.SessionStatus;
 import com.makhov_pet_projects.textik_v_1.exceptions.AiGatewayException;
 import com.makhov_pet_projects.textik_v_1.security.AppUserDetails;
 import com.makhov_pet_projects.textik_v_1.service.AiGateway;
@@ -103,6 +104,47 @@ public class SessionController {
 		}
 		sessions.answerQuestions(id, user.id(), answers);
 		return "redirect:/sessions/" + id + "/think";
+	}
+
+	@GetMapping("/sessions/{id}/discuss")
+	String discuss(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
+			@RequestParam(defaultValue = "false") boolean error, Model model) {
+		LearningSession session = sessions.startDiscussion(id, user.id())
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+		if (session.getStatus() == SessionStatus.READ) {
+			return "redirect:/sessions/" + id + "/think";
+		}
+		addDiscussionAttributes(session, error, model);
+		return "discuss";
+	}
+
+	@PostMapping("/sessions/{id}/discuss")
+	String sendMessage(@PathVariable Long id, @AuthenticationPrincipal AppUserDetails user,
+			@RequestParam(required = false) String message) {
+		LearningSession session = sessions.findForOwner(id, user.id())
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+		if (session.getStatus() != SessionStatus.DISCUSS) {
+			return "redirect:/sessions/" + id + "/discuss";
+		}
+		if (message == null || message.isBlank()) {
+			return "redirect:/sessions/" + id + "/discuss?error=1";
+		}
+		try {
+			sessions.sendMessage(id, user.id(), message.trim());
+			return "redirect:/sessions/" + id + "/discuss";
+		} catch (AiGatewayException e) {
+			log.warn("Не удалось получить ответ ИИ в обсуждении сессии {}", id, e);
+			return "redirect:/sessions/" + id + "/discuss?error=1";
+		}
+	}
+
+	private void addDiscussionAttributes(LearningSession session, boolean error, Model model) {
+		long turns = session.userTurns();
+		model.addAttribute("learningSession", session);
+		model.addAttribute("messages", session.getChatMessages());
+		model.addAttribute("userTurns", turns);
+		model.addAttribute("messagesLeft", Math.max(0L, SessionService.REVIEW_AFTER_USER_TURNS - turns));
+		model.addAttribute("error", error || session.getChatMessages().isEmpty());
 	}
 
 	private boolean summary(LearningSession session) {

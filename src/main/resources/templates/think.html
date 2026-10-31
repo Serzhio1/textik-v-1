@@ -53,7 +53,8 @@
 			<p class="score__meta" th:text="${wrongCount} + ' wrong'">0 wrong</p>
 		</div>
 
-		<button type="button" class="button-disabled" disabled title="Available in the next stage">To discussion</button>
+		<a class="button-start button-start--spaced"
+		   th:href="@{/sessions/{id}/discuss(id=${learningSession.id})}" href="#">To discussion</a>
 	</div>
 </main>
 </body>
