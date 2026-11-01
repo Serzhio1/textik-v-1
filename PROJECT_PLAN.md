@@ -59,7 +59,7 @@ docker compose up -d            # Postgres 17, хост-порт 5433
 |---|--------|---------|--------|
 | 1 | Источник контента | **Генерация через LLM API** | Тексты и вопросы генерирует ИИ из профиля (интересы + уровень), готового контент-сида нет |
 | 2 | Обсуждение (Discuss) | **Реальный LLM через API** | Диалог ведёт модель, не скрипт |
-| 3 | База данных | **PostgreSQL через `compose.yaml`** | Контейнер `postgres:17-alpine`, том, healthcheck, порт **5433** (5432 занят локальным Postgres). Модуль docker-compose Spring Boot 4 не используем: контейнер для разработки поднимается вручную |
+| 3 | База данных | **PostgreSQL через `compose.yaml`** | Контейнер `postgres:17-alpine`, том, healthcheck, порт **5433** (5432 занят локальным Postgres). Модуль `spring-boot-docker-compose` есть в зависимостях, но в тестах отключён; контейнер для разработки можно поднимать вручную |
 | 4 | Пользователи | **Логин + пароль** | Spring Security, форма регистрации/входа, BCrypt. **Email = логин**; в `users` хранится `username` — имя (Sergey и т.п.), видно в профиле и в диалоге с ИИ |
 | 5 | Интерфейс | **Thymeleaf SSR** | Серверный рендеринг, один артефакт |
 | 6 | Способ интеграции с LLM | **Spring AI** | Structured Output: модель отдаёт JSON → record в `dto` |
@@ -289,7 +289,7 @@ CSRF-токен после входа перевыпускается (5.1).
 запросы проходят; перехватчик `chatCompletionIdCustomizer` и санитайзер `ChatCompletionJson`
 чинят недо-стандартный ответ (20, 21). Автоматические тесты дополнительно проверяют разбор
 JSON, отказоустойчивость и оба режима wiring (3.6). На Этап 10 остаётся живой прогон всех
-шести методов `AiGateway`; README с переменными окружения уже есть, его нужно дополнить
+семи методов `AiGateway`; README с переменными окружения уже есть, его нужно дополнить
 инструкцией по получению ключа.
 
 ### 3.8 Чего ещё нет
@@ -409,11 +409,11 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - **Первый заход.** `GET /review` доступен из `DISCUSS` после 3 реплик ученика. Сервис считает
   правильные ответы по `Question.isCorrect()` (без ответа — неверный), просит `generateReview`,
   сохраняет `session_reviews`, переводит сессию в `DONE`. Оценка разговора валидируется по
-  уровням профиля, при невалидном значении берётся уровень сессии; `mainErrors` нормализуется
-  в nullable `text`.
+  списку `A1/A2/B1`, при невалидном значении берётся уровень сессии; `mainErrors` нормализуется
+  в текст (`null` → пустая строка, колонка остаётся nullable).
 - **Повторный заход.** Сохранённое ревью отдаётся без вызова ИИ; страница доступна и для `DONE`,
-  и для `DISCUSS`, если ревью уже есть. Ранний заход из `READ`/`THINK` → редирект на текущий
-  этап, чужая или отсутствующая сессия → 404.
+  и для `DISCUSS`, если ревью уже есть. Ранний заход: `READ` → `/think`, `THINK` → `/discuss`
+  (с переходом в `DISCUSS`), чужая или отсутствующая сессия → 404.
 - **Сбой ИИ.** Транзакция откатывается, сессия остаётся в `DISCUSS`, ничего не сохраняется,
   `/discuss?reviewError=1` показывает английское сообщение и позволяет повторить.
 - **Интерфейс.** Поздравление, оба резюме, счёт `correct/total`, оценка разговора, блок
@@ -435,7 +435,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       Liquibase-миграции `001`–`006` (схема — 3.1).
 
 ### Этап 2. Доменная модель — выполнен
-- [x] 6 сущностей, 2 enum, 6 репозиториев, 16 юнит-тестов домена (3.2).
+- [x] 6 сущностей, 2 enum, 6 репозиториев, 16 юнит-тестов домена на момент этапа (сейчас 23 — 3.6).
 
 ### Этап 3. Аутентификация — выполнен
 - [x] Form login, BCrypt, регистрация с автологином, выход, 10 тестов MockMvc + ручная
@@ -473,7 +473,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       `GigaChatClientConfig` (перехватчик заголовка авторизации). Модель по умолчанию `GigaChat-2`.
 - [x] Проверка: 46 тестов слоя ИИ и конфигурации, сеть не используется; полный цикл офлайн
       проверяется на Этапах 6–9. Живой вызов с настоящим ключом GigaChat проверен (3.7, 5);
-      живой прогон всех шести методов — Этап 10.
+      живой прогон всех семи методов — Этап 10.
 
 ### Этап 6. Главный экран + выбор темы + чтение (Read)
 - [x] Home: название приложения, 4 плашки этапов с временем + «Начать сессию».
@@ -533,7 +533,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - [ ] Тесты: проверка ответа, проверка владельца, генерация через stub.
 - [ ] README: как получить ключ (GigaChat/OpenAI/другой провайдер), какие поля конфига
       заполнить: `AI_PROVIDER`, `GIGACHAT_AUTH_KEY` или `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`,
-      необязательный `AI_FALLBACK`; живой вызов всех шести методов `AiGateway`.
+      необязательный `AI_FALLBACK`; живой вызов всех семи методов `AiGateway`.
 - [ ] `./mvnw test` зелёный, полный пользовательский сценарий без падений.
 
 ---
@@ -793,7 +793,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
   (проверено `javap`: в байт-коде они всё равно `public static`).
 - Применено к `support/TestFixtures`, `support/FakeChatModel`, `utility/Interests`,
   `utility/AiPrompts`, `utility/Initials`, `utility/ChatCompletionIds`,
-  `utility/ChatCompletionJson`; Lombok подключён и для `default-testCompile`
+  `utility/ChatCompletionJson`, `utility/CorrectionGuard`; Lombok подключён и для `default-testCompile`
   (`maven-compiler-plugin`, `annotationProcessorPaths`).
 - `@Component`-классы, `@TestConfiguration` и базовые тест-классы (`PostgresRepositoryTest`,
   `PostgresTestConfiguration`, `WebTest`) аннотацию не получают: им нужен Spring или
@@ -809,7 +809,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - Проверено по всему проекту: `private final`-поля есть у 11 классов — `controller/AuthController`
   (4 зависимости), `controller/OnboardingController` (1), `controller/ProfileController` (2),
   `controller/SessionController` (3), `service/UserRegistrationService` (2), `service/ProfileService`
-  (1), `service/SessionService` (2), `service/SpringAiGateway` (1), `service/FallbackAiGateway` (2),
+  (1), `service/SessionService` (4), `service/SpringAiGateway` (1), `service/FallbackAiGateway` (2),
   `security/OnboardingInterceptor` (1), `config/WebConfig` (1) — все на `@RequiredArgsConstructor`.
   Lombok подключён и для main, и для test.
 - Исключения: JPA-сущности (поля не могут быть `final`, конструктор — часть доменного API),
@@ -831,12 +831,12 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 | `enums` | `SessionStatus`, `ChatRole` | `@Entity` (перечисления маппятся `@Enumerated`) |
 | `repository` | 6 интерфейсов Spring Data JPA | Бизнес-логики и `@Transactional` (транзакции — в сервисах) |
 | `service` | `UserRegistrationService`, `ProfileService`, `SessionService`, `GigaChatTokenService`, `AiGateway` + `SpringAiGateway`, `StubAiGateway`, `FallbackAiGateway` | HTTP-аннотаций, `Model`, `HttpServletRequest` |
-| `dto` | `RegistrationForm`, `ProfileForm`, records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `ReviewData` | JPA-аннотаций и связей с БД |
+| `dto` | `RegistrationForm`, `ProfileForm`, records structured output: `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `LearnerCorrection`, `ReviewData` | JPA-аннотаций и связей с БД |
 | `exceptions` | `EmailAlreadyTakenException`, `AiGatewayException` (+ будущие: сессия не найдена, не владелец) | `@Service`, обработчиков `@ControllerAdvice` |
 | `controller` | `AuthController`, `HomeController`, `OnboardingController`, `ProfileController`, `SessionController` | Бизнес-логики, `@Entity`, прямого `Repository` |
 | `config` | `SecurityConfig`, `WebConfig` (регистрация `HandlerInterceptor`), `AiGatewayConfig`, `AiProperties`, `GigaChatClientConfig`, `GigaChatProperties` | Контроллеров, сервисов, сущностей |
 | `security` | `AppUserDetails`, `OnboardingInterceptor` | `@Configuration` — это уже `config` |
-| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests`, `AiPrompts`, `Initials`, `ChatCompletionIds`, `ChatCompletionJson` | `@Component`, `@Service`, состояния |
+| `utility` | stateless-хелперы main (`@UtilityClass`): `Interests`, `AiPrompts`, `Initials`, `ChatCompletionIds`, `ChatCompletionJson`, `CorrectionGuard` | `@Component`, `@Service`, состояния |
 
 Направления зависимостей (единственные разрешённые):
 
