@@ -51,7 +51,7 @@ public class SpringAiGateway implements AiGateway {
 		StructuredOutputConverter<GeneratedText> converter =
 				new BeanOutputConverter<>(GeneratedText.class);
 		String user = String.format(AiPrompts.TEXT_USER,
-				topic.title(), topic.description(), profile.getLevel(), profile.getLevel(), profile.getInterests());
+				topic.title(), topic.description(), profile.getLevel(), profile.getInterests(), profile.getLevel());
 		return askStructured(converter, AiPrompts.TEXT_SYSTEM, user);
 	}
 

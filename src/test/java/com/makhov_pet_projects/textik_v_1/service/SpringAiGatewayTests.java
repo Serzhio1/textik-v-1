@@ -89,6 +89,28 @@ class SpringAiGatewayTests {
 	}
 
 	@Test
+	@DisplayName("Тест, в котором мы проверяем, что промпт текста просит поля DTO, а не выдуманную схему")
+	void sendsTextPromptWithDtoFields() {
+		//Arrange
+		AtomicReference<Prompt> recorded = new AtomicReference<>();
+		SpringAiGateway gateway = new SpringAiGateway(
+				ChatClient.builder(FakeChatModel.recording(recorded, TEXT_JSON)));
+
+		//Act
+		gateway.generateText(new TopicProposal("Reading", "О чём"), profile);
+
+		//Assert
+		String prompt = recorded.get().getUserMessage().getText();
+		assertThat(prompt)
+				.contains("B1")
+				.contains("технологии, спорт")
+				.contains("\"text\"")
+				.doesNotContain("\"paragraphs\"")
+				.doesNotContain("\"introduction\"")
+				.doesNotContain("audio");
+	}
+
+	@Test
 	@DisplayName("Тест, в котором мы проверяем, что вопросы разбираются вместе с вариантами ответа")
 	void parsesQuestions() {
 		//Arrange

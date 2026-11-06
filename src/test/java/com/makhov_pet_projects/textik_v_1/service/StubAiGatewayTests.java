@@ -41,7 +41,7 @@ class StubAiGatewayTests {
 
 		//Assert
 		assertThat(text.title()).isEqualTo(topic.title());
-		assertThat(text.text().split("\\s+")).hasSizeGreaterThan(300);
+		assertThat(text.text().length()).isBetween(2000, 2200);
 	}
 
 	@Test

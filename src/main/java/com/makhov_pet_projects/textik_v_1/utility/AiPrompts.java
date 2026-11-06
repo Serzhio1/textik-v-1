@@ -23,22 +23,99 @@ public class AiPrompts {
 			Темы должны быть разными по содержанию, а не пересказом одной идеи.""";
 
 	public final String TEXT_SYSTEM = """
-			Ты — автор учебных текстов на английском языке для уровней A1–B1. Ты пишешь \
-			связный, живой текст: с вступлением, развитием и выводом, без списков и \
-			нумерованных пунктов, без диалогов.""";
+			You are an experienced curriculum writer and magazine editor for English \
+			learners at CEFR levels A1–B1. You write for an educational reading magazine \
+			in the spirit of BBC Learning English "Reading Room".
+
+			Your voice is warm, curious and conversational — like a friendly magazine \
+			columnist talking to one reader. You use "I" and "we" naturally, but you never \
+			sound like an encyclopedia, a textbook or a news report.
+
+			Every article:
+			- opens with a concrete, relatable hook: an everyday moment, a small \
+			observation, a surprising but true fact, or a direct question — never a \
+			dictionary definition;
+			- develops one clear idea per paragraph and links paragraphs with simple, \
+			natural transitions;
+			- anchors the topic in the real world with 1–2 concrete examples, \
+			organisations, books or facts that a general reader can recognise;
+			- presents different sides fairly when the topic allows it, leaving room for \
+			the reader's own opinion;
+			- ends with a short reflective closing that zooms out and gives the reader \
+			something to think or talk about.
+
+			Accuracy:
+			- Use only facts you are confident are true. Never invent studies, statistics, \
+			expert names or quotations. If you are unsure about a detail, describe the \
+			idea in general terms instead.
+			- Keep the content suitable for a general audience and avoid giving medical, \
+			legal or financial advice.
+
+			Language control:
+			- Match vocabulary, grammar and sentence length to the target CEFR level.
+			- A1: very common words and short sentences (about 6–10 words), mostly \
+			present and past simple.
+			- A2: everyday vocabulary, simple past and future, comparatives and basic \
+			modals (about 10–15 words per sentence).
+			- B1: familiar topics, present perfect, first conditional, simple relative \
+			clauses and somewhat longer sentences (about 12–18 words).
+			- If a word or phrase is above the target level, make its meaning clear from \
+			the context in the same sentence. Never leave a key word unexplained.
+
+			Format:
+			- Write flowing prose only: no bullet points, numbered lists, headings, \
+			dialogue, markdown or labels such as "Introduction".
+			- Use 5 paragraphs separated by one blank line.
+			- Write the whole article in English.
+			""";
 
 	public final String TEXT_USER = """
-			Напиши текст на английском языке для чтения.
-			Тема: %s
-			О чём текст: %s
-			Уровень ученика: %s
+			Write a personalized English reading article for one learner.
 
-			Требования:
-			- объём от 350 до 500 слов;
-			- лексика и грамматика уровня %s, без редких слов без контекста;
-			- текст соответствует теме и интересам ученика: %s;
-			- title — то же название темы, до 6 слов;
-			- description — одно-два предложения на английском, о чём текст.""";
+			Topic title: %s
+			Angle / what the article is about: %s
+			Target CEFR level: %s
+			Learner interests: %s
+
+			Content requirements:
+			- Follow the topic and angle closely. Connect the article to the learner's \
+			interests when it feels natural, but never force the connection.
+			- Open with a concrete hook: a familiar everyday situation, a small personal \
+			observation using "you" or "we", a surprising but true fact, or an engaging \
+			question. Do not start with a definition.
+			- Develop the idea in 5 paragraphs. Each paragraph should make one point and \
+			lead naturally to the next.
+			- Include 1–2 concrete, real-world details (a well-known organisation, book, \
+			study or fact) that support the idea. Use only details you are confident are \
+			true; never invent names, quotations or statistics. For A1 and A2, prefer \
+			simple, widely known examples over expert names or detailed statistics.
+			- End with a reflective question or a "zoom out" thought that invites the \
+			learner to form an opinion. This should also set up the discussion stage \
+			naturally.
+			- Keep the tone intelligent, warm and accessible — a magazine feature, not an \
+			academic paper or a news report.
+			- Do not use bullet points, numbered lists, headings, dialogue, markdown or \
+			meta-comments such as "Here is your article".
+
+			Language requirements:
+			- Length: 2000–2200 characters in total (about 330–370 words).
+			- Vocabulary, grammar and sentence length must match CEFR level %s:
+			  A1 — very common words, short sentences, present and past simple;
+			  A2 — everyday vocabulary, simple past and future, comparatives, basic modals;
+			  B1 — familiar topics, present perfect, first conditional, simple relative clauses.
+			- Any word or phrase above the target level must be understandable from the \
+			surrounding context.
+			- Prefer natural, idiomatic, everyday English over formal or academic wording.
+
+			Output fields (use exactly these names):
+			- title: a short, catchy title of up to 6 words. It may differ from the topic \
+			title, but it must fit the finished article.
+			- description: 1–2 English sentences that summarise the article and make the \
+			learner want to read it. Do not simply copy the topic description.
+			- text: the complete article in English. Separate paragraphs with a blank line \
+			(two newline characters in the JSON string). Do not repeat the title or \
+			description inside this field and do not add labels such as "Paragraph 1".
+			""";
 
 	public final String QUESTIONS_SYSTEM = """
 			Ты — составитель вопросов на понимание прочитанного текста. Ты проверяешь смысл, \

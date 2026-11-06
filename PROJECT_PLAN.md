@@ -200,7 +200,7 @@ Spring Security 7, form login + BCrypt, миграции не потребова
 |------|--------|------|
 | `service` | `AiGateway` | Интерфейс: `generateTopics`, `generateText`, `generateQuestions`, `openDiscussion`, `continueDiscussion`, `correctUserMessage`, `generateReview` |
 | `service` | `SpringAiGateway` | Боевая реализация: `ChatClient.Builder` + `BeanOutputConverter`; любая ошибка → `AiGatewayException` |
-| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~350 слов, 5 вопросов, стартовый вопрос и реплики по ходу разговора, итоги |
+| `service` | `StubAiGateway` | Заглушка для офлайна: 3 темы, текст ~2000 символов, 5 вопросов, стартовый вопрос и реплики по ходу разговора, итоги |
 | `service` | `FallbackAiGateway` | Декоратор «страховка»: при `AiGatewayException` основной модели отвечает резервная |
 | `service` | `GigaChatTokenService` | Обмен `Authorization key` на `access_token` (30 минут): кэш, обновление за минуту до истечения, один обмен под конкуренцией; ключ и токен не логируются |
 | `dto` | `TopicProposal`, `GeneratedText`, `GeneratedQuestion`, `LearnerCorrection`, `ReviewData` | Records structured output |
@@ -312,8 +312,8 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
 - **Выбор темы.** `/select` генерирует 3 темы и кладёт их в HTTP-сессию (атрибут
   `topicProposals`); обновление страницы перегенерирует. Карточка: название + описание +
   «Начать чтение».
-- **Создание сессии.** `POST /sessions` генерирует текст + 5–10 вопросов и сохраняет сессию
-  в статусе **`READ`** (18). Сбой генерации (`AiGatewayException`) → ничего не сохраняется,
+- **Создание сессии.** `POST /sessions` генерирует текст 2000–2200 символов в стиле журнальной
+  колонки + 5–10 вопросов и сохраняет сессию в статусе **`READ`** (18). Сбой генерации (`AiGatewayException`) → ничего не сохраняется,
   302 на `/select?error=1` с уведомлением «We could not prepare the materials. Please try
   again later» (22).
 - **Чтение.** `/sessions/{id}/read` — проверка владельца через `findForOwner` (чужая → 404),
@@ -461,7 +461,7 @@ JSON, отказоустойчивость и оба режима wiring (3.6). 
       Structured Output через `BeanOutputConverter`.
 - [x] Промпты (`utility/AiPrompts`):
       1. 3 идеи тем по интересам/уровню → экран выбора;
-      2. полный текст 350–500 слов под уровень;
+      2. полный текст 2000–2200 символов под уровень в стиле журнала BBC Learning English;
       3. 5–10 вопросов (один правильный из 4 вариантов) с правильными ответами и объяснениями;
       4. стартовый вопрос обсуждения (добавлен на Этапе 8);
       5. обсуждение — «держимся темы, возвращаем ушедшего» (порог 3 реплики ученика считает Этап 8);

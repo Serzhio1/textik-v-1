@@ -17,7 +17,7 @@ public class StubAiGateway implements AiGateway {
 
 	private static final String TEXT = """
 			Reading is one of the most reliable ways to improve your English skills. When you read \
-			regulary, you meet new words in context, see grammar used naturally, and gradually start \
+			regularly, you meet new words in context, see grammar used naturally, and gradually start \
 			to feel how ideas connect with each other. The important part is to choose a text that \
 			matches your level. If a text is too difficult, you stop enjoying it. If it is too easy, \
 			you make almost no progress. The sweet spot is a text where you understand most of the \
@@ -34,6 +34,10 @@ public class StubAiGateway implements AiGateway {
 			transitions you absorb without noticing. After a few months of regular reading, your own \
 			writing sounds more natural. Your attention span grows too, and you start thinking in \
 			English instead of translating every phrase in your head.
+
+			Another benefit is confidence. When you finish a section and realise you understood \
+			the main point, you begin to trust your brain to handle English without translating \
+			every line. That confidence carries over into real conversations.
 
 			To get the most from a text, read actively. Do not stop at every unknown word — try to \
 			guess it from the context first, and only then check the ones that matter. After a \
